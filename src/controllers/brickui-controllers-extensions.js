@@ -173,10 +173,10 @@
 
     // Opcions per defecte cap al controlador d'opcions (si existeix)
     if (def._options &&
-        brick.controllers &&
-        brick.controllers.options &&
-        typeof brick.controllers.options.set === 'function') {
-      brick.controllers.options.set(def._options);
+        brick._controllers &&
+        brick._controllers.options &&
+        typeof brick._controllers.options.set === 'function') {
+      brick._controllers.options.set(def._options);
     }
 
     // Exposar API (_api) al namespace del brick (_ns)
@@ -211,9 +211,9 @@
     // Registrar listeners (_listeners) sobre el bus d'events
     if (Array.isArray(def._listeners) &&
         def._listeners.length &&
-        brick.controllers &&
-        brick.controllers.events &&
-        typeof brick.controllers.events.on === 'function') {
+        brick._controllers &&
+        brick._controllers.events &&
+        typeof brick._controllers.events.on === 'function') {
 
       for (let li = 0; li < def._listeners.length; li += 1) {
         const listener = def._listeners[li];
@@ -243,7 +243,7 @@
           // Quan l'event salta, es crida def[fnName].call(brick, ext, eventData)
           const wrapped = handlerFn.bind(brick, ext);
 
-          brick.controllers.events.on(pattern, phase, pr, wrapped);
+          brick._controllers.events.on(pattern, phase, pr, wrapped);
         }
       }
     }

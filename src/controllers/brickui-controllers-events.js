@@ -4,11 +4,33 @@
    * Manages events shaped as "namespace:event:target" with phases before/on/after.
    * @constructor
    */
-  function EventBusController(brick) {
-    this.brick = brick || null;
-    this.handlers = []; // { pattern, compiled, phase, priority, handler }
-    this.phases = ['before', 'on', 'after'];
+function EventBusController(brick) {
+  this.brick = brick || null;
+  this.handlers = []; // { pattern, compiled, phase, priority, handler }
+  this.phases = ['before', 'on', 'after'];
+
+  // Expose public EventBus API on the brick
+  var bus = this;
+  if (brick) {
+    brick.events = {
+      on: function (pattern, phase, priority, handler) {
+        bus.on(pattern, phase, priority, handler);
+        return brick; // permet chaining
+      },
+      off: function (pattern, phase, handler) {
+        bus.off(pattern, phase, handler);
+        return brick;
+      },
+      fire: function (eventName, payload) {
+        bus.fire(eventName, payload);
+        return brick;
+      },
+      fireAsync: function (eventName, payload) {
+        return bus.fireAsync(eventName, payload);
+      }
+    };
   }
+}
 
   // ---------- Internal utils ----------
 

@@ -27,18 +27,18 @@
     opts.kind = (opts.kind || 'brick').toLowerCase();
     this.id = opts.id;
     this.kind = opts.kind;
-    this.controllers = Object.freeze({
-      options: new BrickUI.controllers.options(opts),
+    this._controllers = Object.freeze({
+      options: new BrickUI.controllers.options(this,opts),
       events: new BrickUI.controllers.events(this),
       extensions: new BrickUI.controllers.extensions(this),
     });
 
-    this.controllers.extensions.applyAll();
-    this.controllers.events.fireAsync('brick:ready:*', { options: opts });
+    this._controllers.extensions.applyAll();
+    this._controllers.events.fireAsync('brick:ready:*', { options: opts });
   }
 
   Brick.prototype.destroy = function () {
-    this.controllers.events.fire('brick:destroy:*', {});
+    this._controllers.events.fire('brick:destroy:*', {});
   };
 
   BrickUI.brick = Brick;
@@ -50,11 +50,33 @@
    * Manages events shaped as "namespace:event:target" with phases before/on/after.
    * @constructor
    */
-  function EventBusController(brick) {
-    this.brick = brick || null;
-    this.handlers = []; // { pattern, compiled, phase, priority, handler }
-    this.phases = ['before', 'on', 'after'];
+function EventBusController(brick) {
+  this.brick = brick || null;
+  this.handlers = []; // { pattern, compiled, phase, priority, handler }
+  this.phases = ['before', 'on', 'after'];
+
+  // Expose public EventBus API on the brick
+  var bus = this;
+  if (brick) {
+    brick.events = {
+      on: function (pattern, phase, priority, handler) {
+        bus.on(pattern, phase, priority, handler);
+        return brick; // permet chaining
+      },
+      off: function (pattern, phase, handler) {
+        bus.off(pattern, phase, handler);
+        return brick;
+      },
+      fire: function (eventName, payload) {
+        bus.fire(eventName, payload);
+        return brick;
+      },
+      fireAsync: function (eventName, payload) {
+        return bus.fireAsync(eventName, payload);
+      }
+    };
   }
+}
 
   // ---------- Internal utils ----------
 
@@ -429,10 +451,10 @@
 
     // Opcions per defecte cap al controlador d'opcions (si existeix)
     if (def._options &&
-        brick.controllers &&
-        brick.controllers.options &&
-        typeof brick.controllers.options.set === 'function') {
-      brick.controllers.options.set(def._options);
+        brick._controllers &&
+        brick._controllers.options &&
+        typeof brick._controllers.options.set === 'function') {
+      brick._controllers.options.set(def._options);
     }
 
     // Exposar API (_api) al namespace del brick (_ns)
@@ -467,9 +489,9 @@
     // Registrar listeners (_listeners) sobre el bus d'events
     if (Array.isArray(def._listeners) &&
         def._listeners.length &&
-        brick.controllers &&
-        brick.controllers.events &&
-        typeof brick.controllers.events.on === 'function') {
+        brick._controllers &&
+        brick._controllers.events &&
+        typeof brick._controllers.events.on === 'function') {
 
       for (let li = 0; li < def._listeners.length; li += 1) {
         const listener = def._listeners[li];
@@ -499,7 +521,7 @@
           // Quan l'event salta, es crida def[fnName].call(brick, ext, eventData)
           const wrapped = handlerFn.bind(brick, ext);
 
-          brick.controllers.events.on(pattern, phase, pr, wrapped);
+          brick._controllers.events.on(pattern, phase, pr, wrapped);
         }
       }
     }
@@ -563,12 +585,16 @@
 ;(function (BrickUI) {
   /**
    * Per-brick options controller.
-   * Holds a plain object and offers get/set accessors.
+   * Guarda un objecte pla i ofereix get/set/has/all.
    * @constructor
+   * @param {Object} brick
    * @param {Object} initial
-  */
-  function OptionsController(initial) {
+   */
+  function OptionsController(brick, initial) {
+    this.brick = brick;
     this.data = {};
+    this._eventsBound = false;
+
     if (initial && typeof initial === 'object') {
       for (const k in initial) {
         if (Object.prototype.hasOwnProperty.call(initial, k)) {
@@ -576,23 +602,135 @@
         }
       }
     }
+
+    var ctrl = this;
+
+    // API pública al brick
+    brick.options = {
+      get: function (key, fallback) {
+        return ctrl.get(key, fallback);
+      },
+
+      // Async: sempre passa pel eventBus (fireAsync)
+      set: async function (key, value) {
+        await ctrl.set(key, value);
+        return brick; // permet await brick.options.set(...); i chaining
+      },
+
+      has: function (key) {
+        return ctrl.has(key);
+      },
+
+      all: function () {
+        return ctrl.all();
+      }
+    };
   }
 
   /**
-   * Set a value or merge an object.
-   * @param {string|Object} key
-   * @param {any} value
+   * Registra el handler _apply al bus d'events
+   * per a la fase "on" de "options:value:*".
+   * Només es fa un cop.
    */
-  OptionsController.prototype.set = function (key, value) {
-    if (key && typeof key === 'object' && !Array.isArray(key)) {
-      for (const k in key) {
-        if (Object.prototype.hasOwnProperty.call(key, k)) {
-          this.data[k] = key[k];
+  OptionsController.prototype._ensureEventsBinding = function () {
+    if (this._eventsBound) return;
+
+    var brick = this.brick;
+    var self = this;
+
+    // Confies en la arquitectura: brick.events i on() EXISTEIXEN.
+    brick.events.on('options:value:*', 'on', 5, function (ev) {
+      self._apply(ev);
+    });
+
+    this._eventsBound = true;
+  };
+
+  /**
+   * Handler de fase "on" per "options:value:*".
+   * Aplica els canvis a this.data a partir de ev.data.
+   *
+   * Shape assumit:
+   *  - single: { key, value, previous, options, brick }
+   *  - batch:  { batch:true, values:{...}, previous:{...}, options, brick }
+   *
+   * @param {Object} ev - event del EventBus
+   */
+  OptionsController.prototype._apply = function (ev) {
+    if (!ev) return;
+    var payload = ev.data || {};
+
+    // Batch: set({ a:1, b:2 })
+    if (payload.batch && payload.values && typeof payload.values === 'object') {
+      for (var k in payload.values) {
+        if (Object.prototype.hasOwnProperty.call(payload.values, k)) {
+          this.data[k] = payload.values[k];
         }
       }
       return;
     }
-    this.data[key] = value;
+
+    // Single: set('foo', 123)
+    if (typeof payload.key === 'string') {
+      this.data[payload.key] = payload.value;
+    }
+  };
+
+  /**
+   * Set a value or merge an object, disparant events options:value.
+   * Sempre usa fireAsync per permetre handlers async.
+   *
+   * @param {string|Object} key
+   * @param {any} value
+   * @returns {Promise<OptionsController>}
+   */
+  OptionsController.prototype.set = async function (key, value) {
+    this._ensureEventsBinding();
+
+    var brick = this.brick;
+
+    // OBJECTE: set({ a:1, b:2 })
+    if (key && typeof key === 'object' && !Array.isArray(key)) {
+      var values = {};
+      var previous = {};
+
+      for (var k in key) {
+        if (!Object.prototype.hasOwnProperty.call(key, k)) continue;
+        values[k] = key[k];
+        previous[k] = Object.prototype.hasOwnProperty.call(this.data, k)
+          ? this.data[k]
+          : undefined;
+      }
+
+      var batchPayload = {
+        batch: true,
+        values: values,
+        previous: previous,
+        options: this,
+        brick: brick
+      };
+
+      // sense target: "options:value:"
+      await brick.events.fireAsync('options:value:', batchPayload);
+      return this;
+    }
+
+    // SINGLE: set('theme', 'dark')
+    var oldValue = Object.prototype.hasOwnProperty.call(this.data, key)
+      ? this.data[key]
+      : undefined;
+
+    var payload = {
+      key: key,
+      value: value,
+      previous: oldValue,
+      options: this,
+      brick: brick
+    };
+
+    // amb target: "options:value:<key>"
+    await brick.events.fireAsync('options:value:' + key, payload);
+    return this;
   };
 
   /**
@@ -602,10 +740,153 @@
    * @returns {any}
    */
   OptionsController.prototype.get = function (key, fallback) {
-    if (Object.prototype.hasOwnProperty.call(this.data, key)) return this.data[key];
+    if (Object.prototype.hasOwnProperty.call(this.data, key)) {
+      return this.data[key];
+    }
     return fallback;
+  };
+
+  /**
+   * Indica si la clau existeix.
+   * @param {string} key
+   * @returns {boolean}
+   */
+  OptionsController.prototype.has = function (key) {
+    return Object.prototype.hasOwnProperty.call(this.data, key);
+  };
+
+  /**
+   * Retorna una còpia superficial de totes les opcions.
+   * @returns {Object}
+   */
+  OptionsController.prototype.all = function () {
+    return Object.assign({}, this.data);
   };
 
   BrickUI.controllers = BrickUI.controllers || {};
   BrickUI.controllers.options = OptionsController;
+})(window.BrickUI);
+
+;(function (BrickUI) {
+  BrickUI = BrickUI || (window.BrickUI = window.BrickUI || {});
+  BrickUI.extensions = BrickUI.extensions || {};
+
+  function resolveElement(value) {
+    if (!value) return null;
+    if (typeof Element !== 'undefined' && value instanceof Element) return value;
+    if (value && value.nodeType === 1) return value;
+    if (typeof value === 'function') {
+      try {
+        return value();
+      } catch (err) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function resolveById(id) {
+    if (!id || typeof id !== 'string') return null;
+    if (typeof document === 'undefined') return null;
+    return document.getElementById(id) || null;
+  }
+
+  BrickUI.extensions.dom = {
+    _name: 'dom',
+    _for: '*',
+    _ns: 'dom',
+    _api: ['getElement', 'on', 'off'],
+    _listeners: [
+      { for: 'brick:ready:*', handlers: [{ phase: 'on', fn: 'onReady' }] },
+      { for: 'brick:destroy:*', handlers: [{ phase: 'before', fn: 'onDestroy' }] },
+    ],
+
+    init: function (ext) {
+      const hasOptions = this.options && typeof this.options.get === 'function';
+      const elemOpt = hasOptions ? this.options.get('dom.element', null) : null;
+      const idOpt = hasOptions ? this.options.get('dom.id', null) : null;
+
+      let el = resolveElement(elemOpt);
+      if (!el && idOpt) {
+        el = resolveById(idOpt);
+      }
+
+      if (!el) {
+        console.warn('BrickUI dom extension requires a DOM element (options.dom.element) or a valid options.dom.id', this.id);
+        return false;
+      }
+
+      if (elemOpt && !resolveElement(elemOpt)) {
+        console.warn('BrickUI dom element must be a DOM node or factory, not an id. Use options.dom.id to resolve by id.', this.id);
+      }
+
+      ext.data.element = el;
+      ext.data.listeners = [];
+    },
+
+    getElement: function (ext) {
+      return ext.data.element || null;
+    },
+
+    on: function (ext, type, handler, options) {
+      const el = ext.data.element;
+      if (!el || typeof el.addEventListener !== 'function' || typeof handler !== 'function') return;
+      el.addEventListener(type, handler, options);
+      ext.data.listeners.push({ type: type, handler: handler, options: options, source: 'api' });
+    },
+
+    off: function (ext, type, handler, options) {
+      const el = ext.data.element;
+      if (!el || typeof el.removeEventListener !== 'function' || typeof handler !== 'function') return;
+      el.removeEventListener(type, handler, options);
+
+      if (Array.isArray(ext.data.listeners)) {
+        for (let i = ext.data.listeners.length - 1; i >= 0; i -= 1) {
+          const ln = ext.data.listeners[i];
+          if (ln.type === type && ln.handler === handler) {
+            ext.data.listeners.splice(i, 1);
+          }
+        }
+      }
+    },
+
+    onReady: function (ext) {
+      const el = ext.data.element;
+      if (!el || typeof el.addEventListener !== 'function') return;
+
+      const brick = this;
+      const defaultMap = [
+        { type: 'click', eventName: 'dom:click:*' },
+        { type: 'mouseenter', eventName: 'dom:hover:on' },
+        { type: 'mouseleave', eventName: 'dom:hover:off' },
+        { type: 'mousedown', eventName: 'dom:mouse:down' },
+        { type: 'mouseup', eventName: 'dom:mouse:up' },
+      ];
+
+      for (let i = 0; i < defaultMap.length; i += 1) {
+        const entry = defaultMap[i];
+        const handler = function (domEvent) {
+          brick.events.fire(entry.eventName, {
+            domEvent: domEvent,
+            element: el,
+          });
+        };
+        el.addEventListener(entry.type, handler);
+        ext.data.listeners.push({ type: entry.type, handler: handler, source: 'default' });
+      }
+    },
+
+    onDestroy: function (ext) {
+      const el = ext.data.element;
+      if (!el || typeof el.removeEventListener !== 'function') return;
+
+      const listeners = ext.data.listeners || [];
+      for (let i = 0; i < listeners.length; i += 1) {
+        const ln = listeners[i];
+        el.removeEventListener(ln.type, ln.handler, ln.options);
+      }
+
+      ext.data.listeners = [];
+    },
+  };
 })(window.BrickUI);

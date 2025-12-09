@@ -12,6 +12,9 @@
     <h1>BrickUI demo</h1>
     <p>Pagina minima per carregar <code>../dist/brickui.js</code> i l'extensio de prova.</p>
   </main>
+  <div id="demo-dom-brick" style="padding: 12px; margin-top: 16px; border: 1px dashed #888;">
+    BrickUI DOM demo area (click or hover me).
+  </div>
   <script>
     // Crea un brick de prova quan el DOM esta llest
     window.addEventListener('DOMContentLoaded', function () {
@@ -24,7 +27,16 @@
         id: 'demo-brick',
         kind: 'demo'
       });
+
       console.warn("... and now we got it!!", demoBrick);
+      console.warn("Let's create a dom brick...");
+
+      const domBrick = new BrickUI.brick({
+        id: 'dom-brick',
+        kind: 'demo-dom',
+        'dom.id': 'demo-dom-brick'
+      });
+      console.warn("... and now we got it!!", domBrick);
     });
   </script>
 </body>

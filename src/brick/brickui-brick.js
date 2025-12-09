@@ -16,18 +16,18 @@
     opts.kind = (opts.kind || 'brick').toLowerCase();
     this.id = opts.id;
     this.kind = opts.kind;
-    this.controllers = Object.freeze({
-      options: new BrickUI.controllers.options(opts),
+    this._controllers = Object.freeze({
+      options: new BrickUI.controllers.options(this,opts),
       events: new BrickUI.controllers.events(this),
       extensions: new BrickUI.controllers.extensions(this),
     });
 
-    this.controllers.extensions.applyAll();
-    this.controllers.events.fireAsync('brick:ready:*', { options: opts });
+    this._controllers.extensions.applyAll();
+    this._controllers.events.fireAsync('brick:ready:*', { options: opts });
   }
 
   Brick.prototype.destroy = function () {
-    this.controllers.events.fire('brick:destroy:*', {});
+    this._controllers.events.fire('brick:destroy:*', {});
   };
 
   BrickUI.brick = Brick;
