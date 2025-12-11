@@ -1,73 +1,83 @@
 # BrickUI
 
-BrickUI is a small, experimental, event-driven UI/runtime built with **plain JavaScript**.  
-It’s a **functional proof of concept** that explores how far you can go with simple “bricks” and a powerful event/extension model, without frameworks or heavy dependencies.
+BrickUI is an experimental **vanilla-JavaScript UI micro-framework** built around “bricks”:
+small, self-contained components (grids, forms, etc.) wired together by a powerful event bus
+and an extensible plugin system.
 
-> Load a script, create some bricks, wire extensions and events, and let the page react.
+> **Status:** early alpha – architecture is still moving, APIs will break.
+>  
+> **Goal:** be a *real* playground for enterprise-style components (grids/forms) with
+> strong lifecycle and events, but **zero runtime dependencies** and a **single JS file**.
 
-Check the demo [text](https://pere-gr.github.io/brickui/)
 ---
 
 ## Why BrickUI?
 
-Most UI stacks today come with:
+Most component libraries give you tons of widgets but very little control over what happens
+**before** and **after** something changes. You usually get a single callback (“onChange”),
+often at the wrong time, and then you’re fighting the framework.
 
-- Large dependency trees and complex tooling.
-- Strong coupling between components and the DOM.
-- Highly opinionated architectures that are hard to adopt incrementally.
+BrickUI is an experiment to flip that around:
 
-BrickUI is an experiment in the opposite direction:
+- Every interesting thing is an **event** with 3 phases: `before` → `on` → `after`.
+- Events are named like `namespace:action:target` and can use wildcards.
+- Extensions subscribe to those events and can **cancel**, **modify**, or **react** to them.
+- Components stay small and composable; “magic” lives in extensions.
 
-- **No mandatory build tools** for using it (just a `<script>` tag).
-- **No framework lifecycle** to learn.
-- **Everything is just JavaScript objects** with clear contracts.
-
-The goal is to see how far a lean, event-driven runtime can go for real-world, data-heavy apps (forms, grids, “enterprise” screens) **without** sacrificing simplicity.
-
----
-
-## What BrickUI is (and is not)
-
-- ✅ A **functional proof of concept** for:
-  - Event-driven components (“bricks”).
-  - A 3-phase event model (`before`, `on`, `after`).
-  - A powerful, declarative **extension** mechanism.
-- ✅ A small, focused runtime aimed at **vanilla JS** and **simple integration**.
-
-- ❌ It is **not** positioned as a framework (yet).
-- ❌ It is **not** production-ready.
-- ❌ It does **not** try to replace React/Vue/Angular.
-
-Think of BrickUI as a **playground** for an idea: a clean architecture where components + extensions + events can cover most “enterprise UI” needs using just JavaScript.
+All of this runs on plain JS, no bundler required to *use* it.
 
 ---
 
-## Core Concepts
+## Features (current snapshot)
 
-### 1. Bricks
+- **Vanilla JS only**  
+  Single runtime file: `dist/brickui.js` – no React, no jQuery, no dependencies. 
 
-A **Brick** is the basic unit. It can represent:
+- **Bricks**  
+  Each brick has:
+  - an `id` and a `kind` (e.g. `grid`, `form`),
+  - an **options controller** (`brick.options.*`),
+  - an **event bus controller** (`brick.events.*`),
+  - an **extensions controller** that installs plugins based on `for` / `requires`.
 
-- A visual component (e.g. a form, grid, field).
-- A non-visual “service brick” (e.g. data loader, validator, workflow).
+- **Event bus with phases**   
+  - Event names like `data:sort:code`, `brick:ready:*`, `store:data:set`, …  
+  - 3 phases: `before`, `on`, `after`.  
+  - Synchronous `fire()` and async `fireAsync()`.
 
-Conceptually, a Brick:
+- **Extension system**   
+  - Extensions declare:
+    - `for`: which brick kinds they apply to.
+    - `requires`: which brick namespaces must exist (`dom`, `store`, …).
+    - `ns`: namespace where their public API will live on the brick.
+    - `brick`: methods exported to `brick[ns].*` (API).
+    - `extension`: internal helpers (`this` is the extension instance).
+    - `events`: subscriptions to the event bus (`before`/`on`/`after`).
+    - `init` / `destroy`: lifecycle hooks.
 
-- Has a unique `id` and a `kind`.
-- Owns a set of **controllers** (options, events, extensions, etc.).
-- Acts as the **`this` context** for handlers and extension APIs.
+- **Auto-bootstrap from the DOM**   
+  Any element with `class="bui"` becomes a brick; the `kind` is read from
+  `brick-kind`, `data-kind` or `data-brick-kind`. The `dom` extension is wired
+  automatically with the element as `dom.element`.
 
-You typically construct a brick by passing an options object; the runtime normalizes it and wires everything internally.
+- **Grid demo** (work in progress)   
+  - `grid` brick kind.  
+  - `columns` extension: header rendering + sorting.  
+  - `rows` extension: body rendering.  
+  - `store` extension: in-memory data with `store.data:*` events.  
+  - Click on a sortable header → raises `store:data:sort` → rows re-render.
 
-### 2. Event System (before / on / after)
+---
+## Demo
 
-BrickUI revolves around a **3-phase event pipeline**:
+[Click here](https://pere-gr.github.io/brickui/)
 
-- `before` – pre-processing, validation, veto logic.
-- `on` – core logic (do the thing).
-- `after` – post-processing, side effects, logging, etc.
+---
+## Quick start
 
-Events are identified by a string pattern:
+Clone the repo and open the demo HTML file:
 
-```text
-namespace:event:target
+```bash
+git clone https://github.com/pere-gr/brickui.git
+cd brickui
+# open index.html in a browser
