@@ -5,6 +5,7 @@ It’s a **functional proof of concept** that explores how far you can go with s
 
 > Load a script, create some bricks, wire extensions and events, and let the page react.
 
+Check the demo [text](https://pere-gr.github.io/brickui/)
 ---
 
 ## Why BrickUI?
