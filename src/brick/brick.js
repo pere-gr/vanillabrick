@@ -21,9 +21,9 @@
       enumerable: true
     });
     const controllers = Object.freeze({
-      options: new BrickUI.controllers.options(this,opts),
-      events: new BrickUI.controllers.events(this),
-      extensions: new BrickUI.controllers.extensions(this),
+      options: new VanillaBrick.controllers.options(this,opts),
+      events: new VanillaBrick.controllers.events(this),
+      extensions: new VanillaBrick.controllers.extensions(this),
     });
     Object.defineProperty(this, '_controllers', {
       value: controllers,
@@ -57,4 +57,5 @@
     enumerable: false
   });
 
-  BrickUI.brick = Brick;
+  VanillaBrick.brick = Brick;
+

@@ -1,4 +1,4 @@
-BrickUI.extensions.domCss = {
+VanillaBrick.extensions.domCss = {
   for: '*',
   requires: ['dom'],
   ns: 'css',
@@ -92,12 +92,12 @@ BrickUI.extensions.domCss = {
 
   init: function () {
     if (!this.brick || !this.brick.dom || typeof this.brick.dom.element !== 'function') {
-      console.warn('BrickUI domCss requires dom extension active', this.brick && this.brick.id);
+      console.warn('VanillaBrick domCss requires dom extension active', this.brick && this.brick.id);
       return false;
     }
     const el = this.brick.dom.element();
     if (!el) {
-      console.warn('BrickUI domCss: no DOM element resolved', this.brick && this.brick.id);
+      console.warn('VanillaBrick domCss: no DOM element resolved', this.brick && this.brick.id);
       return false;
     }
     return true;
@@ -105,3 +105,4 @@ BrickUI.extensions.domCss = {
 
   destroy: function () {}
 };
+

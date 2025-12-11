@@ -1,4 +1,4 @@
-BrickUI.extensions.grid = {
+VanillaBrick.extensions.grid = {
   for: ['grid'],
   requires: ['dom'],
   ns: 'grid',
@@ -33,7 +33,7 @@ BrickUI.extensions.grid = {
         return null;
       }
       const table =
-        root.querySelector('table.bui-grid') ||
+        root.querySelector('table.vb-grid') ||
         root.querySelector('table');
       this.table = table || null;
       return this.table;
@@ -66,8 +66,8 @@ BrickUI.extensions.grid = {
       for (let i = 0; i < rows.length; i += 1) {
         const row = rows[i];
         if (!row || !row.classList) continue;
-        if (i === index) row.classList.add('bui-grid-row-selected');
-        else row.classList.remove('bui-grid-row-selected');
+        if (i === index) row.classList.add('vb-grid-row-selected');
+        else row.classList.remove('vb-grid-row-selected');
       }
       this.selectedIndex = index;
     }
@@ -132,3 +132,6 @@ BrickUI.extensions.grid = {
     }
   }
 };
+
+
+

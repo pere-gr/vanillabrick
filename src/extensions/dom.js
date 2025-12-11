@@ -1,4 +1,4 @@
-BrickUI.extensions.dom = {
+VanillaBrick.extensions.dom = {
   for: '*',
   requires: [],
   ns: 'dom',
@@ -64,12 +64,12 @@ BrickUI.extensions.dom = {
     }
 
     if (!el) {
-      console.warn('BrickUI dom extension requires a DOM element (options.dom.element) or a valid options.dom.id', this.brick.id);
+      console.warn('VanillaBrick dom extension requires a DOM element (options.dom.element) or a valid options.dom.id', this.brick.id);
       return false;
     }
 
     if (elemOpt && !this._resolveElement(elemOpt)) {
-      console.warn('BrickUI dom element must be a DOM node or factory, not an id. Use options.dom.id to resolve by id.', this.brick.id);
+      console.warn('VanillaBrick dom element must be a DOM node or factory, not an id. Use options.dom.id to resolve by id.', this.brick.id);
     }
 
     this.brick.options.set('dom.element', el);
@@ -89,3 +89,4 @@ BrickUI.extensions.dom = {
     }
   }
 };
+

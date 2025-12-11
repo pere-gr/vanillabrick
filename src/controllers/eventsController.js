@@ -206,5 +206,6 @@ function EventBusController(brick) {
 
   // ---------- Hook to global namespace ----------
 
-  BrickUI.controllers = BrickUI.controllers || {};
-  BrickUI.controllers.events = EventBusController;
+  VanillaBrick.controllers = VanillaBrick.controllers || {};
+  VanillaBrick.controllers.events = EventBusController;
+

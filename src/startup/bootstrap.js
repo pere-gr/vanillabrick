@@ -1,5 +1,5 @@
 
-  BrickUI.base = BrickUI.base || {};
+  VanillaBrick.base = VanillaBrick.base || {};
 
   const registry = {
     list: [],
@@ -40,7 +40,7 @@
       element: el
     };
 
-    const brick = new BrickUI.brick(opts);
+    const brick = new VanillaBrick.brick(opts);
 
     el.__brickInstance = brick;
     registry.list.push(brick);
@@ -54,7 +54,7 @@
     const scope = root || document;
     if (!scope.querySelectorAll) return [];
 
-    const nodes = scope.querySelectorAll('.bui');
+    const nodes = scope.querySelectorAll('.vb');
     const created = [];
 
     for (let i = 0; i < nodes.length; i++) {
@@ -65,10 +65,10 @@
     return created;
   }
 
-  BrickUI.base.bootstrap = bootstrap;
-  BrickUI.runtime = BrickUI.runtime || {};
-  BrickUI.runtime.bricks = registry.list || [];
-  BrickUI.base.getBrick = function (id) {
+  VanillaBrick.base.bootstrap = bootstrap;
+  VanillaBrick.runtime = VanillaBrick.runtime || {};
+  VanillaBrick.runtime.bricks = registry.list || [];
+  VanillaBrick.base.getBrick = function (id) {
     return registry.byId[id] || null;
   };
 
@@ -89,3 +89,5 @@
       setTimeout(runOnce, 0);
     }
   }
+
+

@@ -3,9 +3,9 @@ setlocal enabledelayedexpansion
 
 rem Paths
 set "ROOT=%~dp0src"
-set "OUT=%~dp0dist\brickui.js"
-set "TEMPLATE=%~dp0brickui.template.js"
-set "TMP=%TEMP%\brickui_bundle.tmp"
+set "OUT=%~dp0dist\vanillabrick.js"
+set "TEMPLATE=%~dp0VanillaBrick.template.js"
+set "TMP=%TEMP%\VanillaBrick_bundle.tmp"
 
 rem Ensure output directory exists
 if not exist "%~dp0dist" mkdir "%~dp0dist"
@@ -37,3 +37,4 @@ powershell -NoLogo -NoProfile -Command ^
 del /q "%TMP%" >nul 2>&1
 
 echo Done. Output: "%OUT%"
+

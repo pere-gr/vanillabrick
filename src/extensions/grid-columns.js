@@ -1,4 +1,4 @@
-BrickUI.extensions.columns = {
+VanillaBrick.extensions.columns = {
   for: ['grid'],
   requires: ['dom', 'store'],
   ns: 'columns',
@@ -56,7 +56,7 @@ BrickUI.extensions.columns = {
             const th = document.createElement('th');
             th.textContent = col.label || col.datafield || '';
             if (col.sortable && col.datafield) {
-              th.classList.add('bui-sortable');
+              th.classList.add('vb-sortable');
               th.addEventListener('click', (function (colDef) {
                 return function () {
                   brick.columns.sort(colDef.datafield, null);
@@ -91,3 +91,5 @@ BrickUI.extensions.columns = {
     }
   }
 };
+
+

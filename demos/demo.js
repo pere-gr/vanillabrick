@@ -1,10 +1,10 @@
-// Simple "Hello World" extension for BrickUI.
-// Load this file after ../dist/brickui.js.
+// Simple "Hello World" extension for VanillaBrick.
+// Load this file after ../dist/VanillaBrick.js.
 
-(function (BrickUI) {
+(function (VanillaBrick) {
   console.warn("Installing demo extensions");
-  if (!BrickUI || !BrickUI.extensions) {
-    console.error('BrickUI is not loaded. Include ../dist/brickui.js before demo.js');
+  if (!VanillaBrick || !VanillaBrick.extensions) {
+    console.error('VanillaBrick is not loaded. Include ../dist/VanillaBrick.js before demo.js');
     return;
   }
 
@@ -12,12 +12,12 @@
    * Demo extension that logs lifecycle hooks and echoes demo events.
    * @type {object}
    */
-  BrickUI.extensions.demoHelloWorld = {
+  VanillaBrick.extensions.demoHelloWorld = {
     _name: 'demoHelloWorld',
 
     /**
      * Optional init hook that runs for every brick when the extension is attached.
-     * @param {object} ext - Reference to the BrickUI extension configuration.
+     * @param {object} ext - Reference to the VanillaBrick extension configuration.
      * @returns {void}
      */
     init: function (brick,ext) {
@@ -46,7 +46,7 @@
     /**
      * Handles "brick:ready:*" events and triggers demo:say:hello.
      * @param {object} ext - Extension configuration reference.
-     * @param {BrickUIEvent} ev - Event object received by this brick.
+     * @param {VanillaBrickEvent} ev - Event object received by this brick.
      * @returns {void}
      */
     onReady: function (ext, ev) {
@@ -58,7 +58,7 @@
     /**
      * Responds to demo:say events and forwards a goodbye message when appropriate.
      * @param {object} ext - Extension configuration reference.
-     * @param {BrickUIEvent} ev - Event object received by this brick.
+     * @param {VanillaBrickEvent} ev - Event object received by this brick.
      * @returns {void}
      */
     say: function (ext, ev) {
@@ -67,7 +67,7 @@
     }
   };
 
-  BrickUI.extensions.demoDom = {
+  VanillaBrick.extensions.demoDom = {
     _name: 'demoDom',
     _for: '*',
     //_requires: ['dom'],
@@ -99,4 +99,5 @@
       this.css.setStyle("border","1px dashed #888");
     },
   };
-})(window.BrickUI);
+})(window.VanillaBrick);
+

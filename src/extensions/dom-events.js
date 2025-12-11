@@ -1,4 +1,4 @@
-BrickUI.extensions.domEvents = {
+VanillaBrick.extensions.domEvents = {
   for: '*',
   requires: ['dom'],
   ns: 'dom',
@@ -59,3 +59,4 @@ BrickUI.extensions.domEvents = {
   init: function() {},
   destroy: function () {}
 };
+

@@ -21,7 +21,7 @@ const DATA_SAMPLE_ROWS = [
   { code: '20', name: 'twenty', key: 20 },
 ];
 
-BrickUI.extensions.store = {
+VanillaBrick.extensions.store = {
   for: ['form', 'grid'],
   requires: [],
   ns: 'store',
@@ -136,3 +136,4 @@ BrickUI.extensions.store = {
 
   destroy: function () {}
 };
+

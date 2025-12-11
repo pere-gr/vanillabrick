@@ -1,5 +1,5 @@
 /* Contenidor de la graella */
-.bui-grid {
+.vb-grid {
   width: 100%;
   border-collapse: separate;       /* permet border-radius al voltant de la taula */
   border-spacing: 0;
@@ -14,11 +14,11 @@
 }
 
 /* Capçalera */
-.bui-grid thead {
+.vb-grid thead {
   background: linear-gradient(to bottom, #f9fafb, #eef1f6);
 }
 
-.bui-grid th {
+.vb-grid th {
   font-weight: 600;
   text-align: left;
   padding: 8px 12px;
@@ -29,7 +29,7 @@
 }
 
 /* Cèl·lules */
-.bui-grid td {
+.vb-grid td {
   padding: 8px 12px;
   border-bottom: 1px solid #e4e7ec;
   background-color: #ffffff;
@@ -37,42 +37,42 @@
 }
 
 /* Última fila sense línia inferior */
-.bui-grid tbody tr:last-child td {
+.vb-grid tbody tr:last-child td {
   border-bottom: none;
 }
 
 /* Zebra + hover */
-.bui-grid tbody tr:nth-child(even) td {
+.vb-grid tbody tr:nth-child(even) td {
   background-color: #f9fafb;
 }
 
-.bui-grid tbody tr:hover td {
+.vb-grid tbody tr:hover td {
   background-color: #e5f0ff;
 }
 
 /* Fila seleccionada */
-.bui-grid-row-selected td {
+.vb-grid-row-selected td {
   background-color: #d0e6ff !important;
   box-shadow: inset 3px 0 0 #2563eb;
 }
 
-/* Columnes ordenables (classe del teu JS: bui-grid-sortable) */
-.bui-grid-sortable,
-.bui-sortable {
+/* Columnes ordenables (classe del teu JS: vb-grid-sortable) */
+.vb-grid-sortable,
+.vb-sortable {
   cursor: pointer;
   position: relative;
   padding-right: 18px; /* espai per a la fletxa */
   color: #1f2937;
 }
 
-.bui-grid-sortable:hover,
-.bui-sortable:hover {
+.vb-grid-sortable:hover,
+.vb-sortable:hover {
   color: #111827;
 }
 
 /* Iconet de sort “neutre” */
-.bui-grid-sortable::after,
-.bui-sortable::after {
+.vb-grid-sortable::after,
+.vb-sortable::after {
   content: "⇵";
   position: absolute;
   right: 6px;
@@ -83,26 +83,30 @@
 }
 
 /* Si algun dia hi afegeixes classes per estat: asc/desc */
-.bui-grid-sortable.bui-grid-sort-asc::after,
-.bui-sortable.bui-grid-sort-asc::after {
+.vb-grid-sortable.vb-grid-sort-asc::after,
+.vb-sortable.vb-grid-sort-asc::after {
   content: "▲";
   opacity: 0.8;
 }
 
-.bui-grid-sortable.bui-grid-sort-desc::after,
-.bui-sortable.bui-grid-sort-desc::after {
+.vb-grid-sortable.vb-grid-sort-desc::after,
+.vb-sortable.vb-grid-sort-desc::after {
   content: "▼";
   opacity: 0.8;
 }
 
 /* Transicions suaus */
-.bui-grid th,
-.bui-grid td,
-.bui-grid tbody tr {
+.vb-grid th,
+.vb-grid td,
+.vb-grid tbody tr {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 /* Pequena separació exterior si la taula no ocupa tot el layout */
-.bui-grid + .bui-grid {
+.vb-grid + .vb-grid {
   margin-top: 16px;
 }
+
+
+
+

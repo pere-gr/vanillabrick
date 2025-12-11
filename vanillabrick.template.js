@@ -1,6 +1,6 @@
 ;(function (global) {
-  if (global.BrickUI) return;
-  global.BrickUI = {
+  if (global.VanillaBrick) return;
+  global.VanillaBrick = {
     base: {},
     controllers: {},
     brick: null,
@@ -11,6 +11,6 @@
 })(typeof window !== 'undefined' ? window : this);
 
 
-;(function (BrickUI) {
+;(function (VanillaBrick) {
 /* @BUNDLE */
-})(window.BrickUI);
+})(window.VanillaBrick);

@@ -34,7 +34,7 @@
   }
 
   ExtensionsController.prototype.applyAll = function () {
-    const registry = BrickUI.controllers.extensionsRegistry;
+    const registry = VanillaBrick.controllers.extensionsRegistry;
     if (!registry || typeof registry.all !== 'function') return;
 
     const defs = registry.all() || [];
@@ -73,7 +73,7 @@
     }
 
     if (pending.length) {
-      console.warn('BrickUI extensions not installed due to unmet requirements', pending);
+      console.warn('VanillaBrick extensions not installed due to unmet requirements', pending);
     }
 
     this._ensureDestroyHook();
@@ -85,7 +85,7 @@
     const ns = def.ext.ns || name;
 
     if (!name) {
-      console.warn('BrickUI extension without name/ns, skipped', def);
+      console.warn('VanillaBrick extension without name/ns, skipped', def);
       return;
     }
 
@@ -125,11 +125,11 @@
         if (!Object.prototype.hasOwnProperty.call(def.ext.brick, apiName)) continue;
         const apiFn = def.ext.brick[apiName];
         if (typeof apiFn !== 'function') {
-          console.warn('BrickUI extension "' + name + '" api "' + apiName + '" is not a function');
+          console.warn('VanillaBrick extension "' + name + '" api "' + apiName + '" is not a function');
           continue;
         }
         if (nsObj[apiName]) {
-          console.warn('BrickUI extension overwriting API ' + ns + '.' + apiName);
+          console.warn('VanillaBrick extension overwriting API ' + ns + '.' + apiName);
         }
         nsObj[apiName] = apiFn.bind(brick);
       }
@@ -141,7 +141,7 @@
         const res = def.ext.init.call(ext);
         if (res === false) return;
       } catch (err) {
-        console.error('BrickUI extension "' + name + '" init() failed', err);
+        console.error('VanillaBrick extension "' + name + '" init() failed', err);
         return;
       }
     }
@@ -201,7 +201,7 @@
             try {
               def.destroy.call(ext);
             } catch (err) {
-              console.error('BrickUI extension "' + (def.ns || name || '?') + '" destroy() failed', err);
+              console.error('VanillaBrick extension "' + (def.ns || name || '?') + '" destroy() failed', err);
             }
           }
         }
@@ -211,4 +211,5 @@
     );
   };
 
-  BrickUI.controllers.extensions = ExtensionsController;
+  VanillaBrick.controllers.extensions = ExtensionsController;
+

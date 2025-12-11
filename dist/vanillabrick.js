@@ -1,6 +1,6 @@
 ;(function (global) {
-  if (global.BrickUI) return;
-  global.BrickUI = {
+  if (global.VanillaBrick) return;
+  global.VanillaBrick = {
     base: {},
     controllers: {},
     brick: null,
@@ -11,7 +11,7 @@
 })(typeof window !== 'undefined' ? window : this);
 
 
-;(function (BrickUI) {
+;(function (VanillaBrick) {
 
 
   /**
@@ -36,9 +36,9 @@
       enumerable: true
     });
     const controllers = Object.freeze({
-      options: new BrickUI.controllers.options(this,opts),
-      events: new BrickUI.controllers.events(this),
-      extensions: new BrickUI.controllers.extensions(this),
+      options: new VanillaBrick.controllers.options(this,opts),
+      events: new VanillaBrick.controllers.events(this),
+      extensions: new VanillaBrick.controllers.extensions(this),
     });
     Object.defineProperty(this, '_controllers', {
       value: controllers,
@@ -72,9 +72,10 @@
     enumerable: false
   });
 
-  BrickUI.brick = Brick;
+  VanillaBrick.brick = Brick;
 
-BrickUI.extensions.grid = {
+
+VanillaBrick.extensions.grid = {
   for: ['grid'],
   requires: ['dom'],
   ns: 'grid',
@@ -109,7 +110,7 @@ BrickUI.extensions.grid = {
         return null;
       }
       const table =
-        root.querySelector('table.bui-grid') ||
+        root.querySelector('table.vb-grid') ||
         root.querySelector('table');
       this.table = table || null;
       return this.table;
@@ -142,8 +143,8 @@ BrickUI.extensions.grid = {
       for (let i = 0; i < rows.length; i += 1) {
         const row = rows[i];
         if (!row || !row.classList) continue;
-        if (i === index) row.classList.add('bui-grid-row-selected');
-        else row.classList.remove('bui-grid-row-selected');
+        if (i === index) row.classList.add('vb-grid-row-selected');
+        else row.classList.remove('vb-grid-row-selected');
       }
       this.selectedIndex = index;
     }
@@ -208,6 +209,9 @@ BrickUI.extensions.grid = {
     }
   }
 };
+
+
+
 
 
   /**
@@ -417,8 +421,9 @@ function EventBusController(brick) {
 
   // ---------- Hook to global namespace ----------
 
-  BrickUI.controllers = BrickUI.controllers || {};
-  BrickUI.controllers.events = EventBusController;
+  VanillaBrick.controllers = VanillaBrick.controllers || {};
+  VanillaBrick.controllers.events = EventBusController;
+
 
   function matchesFor(def, brick) {
     const rule = def.for || def._for;
@@ -456,7 +461,7 @@ function EventBusController(brick) {
   }
 
   ExtensionsController.prototype.applyAll = function () {
-    const registry = BrickUI.controllers.extensionsRegistry;
+    const registry = VanillaBrick.controllers.extensionsRegistry;
     if (!registry || typeof registry.all !== 'function') return;
 
     const defs = registry.all() || [];
@@ -495,7 +500,7 @@ function EventBusController(brick) {
     }
 
     if (pending.length) {
-      console.warn('BrickUI extensions not installed due to unmet requirements', pending);
+      console.warn('VanillaBrick extensions not installed due to unmet requirements', pending);
     }
 
     this._ensureDestroyHook();
@@ -507,7 +512,7 @@ function EventBusController(brick) {
     const ns = def.ext.ns || name;
 
     if (!name) {
-      console.warn('BrickUI extension without name/ns, skipped', def);
+      console.warn('VanillaBrick extension without name/ns, skipped', def);
       return;
     }
 
@@ -547,11 +552,11 @@ function EventBusController(brick) {
         if (!Object.prototype.hasOwnProperty.call(def.ext.brick, apiName)) continue;
         const apiFn = def.ext.brick[apiName];
         if (typeof apiFn !== 'function') {
-          console.warn('BrickUI extension "' + name + '" api "' + apiName + '" is not a function');
+          console.warn('VanillaBrick extension "' + name + '" api "' + apiName + '" is not a function');
           continue;
         }
         if (nsObj[apiName]) {
-          console.warn('BrickUI extension overwriting API ' + ns + '.' + apiName);
+          console.warn('VanillaBrick extension overwriting API ' + ns + '.' + apiName);
         }
         nsObj[apiName] = apiFn.bind(brick);
       }
@@ -563,7 +568,7 @@ function EventBusController(brick) {
         const res = def.ext.init.call(ext);
         if (res === false) return;
       } catch (err) {
-        console.error('BrickUI extension "' + name + '" init() failed', err);
+        console.error('VanillaBrick extension "' + name + '" init() failed', err);
         return;
       }
     }
@@ -623,7 +628,7 @@ function EventBusController(brick) {
             try {
               def.destroy.call(ext);
             } catch (err) {
-              console.error('BrickUI extension "' + (def.ns || name || '?') + '" destroy() failed', err);
+              console.error('VanillaBrick extension "' + (def.ns || name || '?') + '" destroy() failed', err);
             }
           }
         }
@@ -633,22 +638,23 @@ function EventBusController(brick) {
     );
   };
 
-  BrickUI.controllers.extensions = ExtensionsController;
+  VanillaBrick.controllers.extensions = ExtensionsController;
+
 
   // Diccionari de definicions d'extensions:
-  //   BrickUI.extensions.myExt = { ns: "myExt", ... }
-  BrickUI.extensions = BrickUI.extensions || {};
+  //   VanillaBrick.extensions.myExt = { ns: "myExt", ... }
+  VanillaBrick.extensions = VanillaBrick.extensions || {};
 
   // Petit helper de registre/base
   // (ara mateix només serveix per obtenir totes les definicions)
-  BrickUI.controllers.extensionsRegistry = BrickUI.controllers.extensionsRegistry || {
+  VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extensionsRegistry || {
     /**
      * Retorna un array amb totes les definicions d'extensions
-     * definides a BrickUI.extensions.*
+     * definides a VanillaBrick.extensions.*
      */
     all: function () {
       const list = [];
-      const src = BrickUI.extensions || {};
+      const src = VanillaBrick.extensions || {};
       for (const key in src) {
         if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
         const def = src[key];
@@ -662,6 +668,7 @@ function EventBusController(brick) {
       return list;
     }
   };
+
 
 
   /**
@@ -875,6 +882,9 @@ function EventBusController(brick) {
     return this;
   };
 
+  // Compat: alias set -> setAsync
+  OptionsController.prototype.set = OptionsController.prototype.setAsync;
+
   /**
    * Set sense emetre events.
    * @param {string|Object} key
@@ -999,10 +1009,11 @@ function EventBusController(brick) {
     }
   }
 
-  BrickUI.controllers = BrickUI.controllers || {};
-  BrickUI.controllers.options = OptionsController;
+  VanillaBrick.controllers = VanillaBrick.controllers || {};
+  VanillaBrick.controllers.options = OptionsController;
 
-BrickUI.extensions.domCss = {
+
+VanillaBrick.extensions.domCss = {
   for: '*',
   requires: ['dom'],
   ns: 'css',
@@ -1096,12 +1107,12 @@ BrickUI.extensions.domCss = {
 
   init: function () {
     if (!this.brick || !this.brick.dom || typeof this.brick.dom.element !== 'function') {
-      console.warn('BrickUI domCss requires dom extension active', this.brick && this.brick.id);
+      console.warn('VanillaBrick domCss requires dom extension active', this.brick && this.brick.id);
       return false;
     }
     const el = this.brick.dom.element();
     if (!el) {
-      console.warn('BrickUI domCss: no DOM element resolved', this.brick && this.brick.id);
+      console.warn('VanillaBrick domCss: no DOM element resolved', this.brick && this.brick.id);
       return false;
     }
     return true;
@@ -1110,7 +1121,8 @@ BrickUI.extensions.domCss = {
   destroy: function () {}
 };
 
-BrickUI.extensions.domEvents = {
+
+VanillaBrick.extensions.domEvents = {
   for: '*',
   requires: ['dom'],
   ns: 'dom',
@@ -1172,7 +1184,8 @@ BrickUI.extensions.domEvents = {
   destroy: function () {}
 };
 
-BrickUI.extensions.dom = {
+
+VanillaBrick.extensions.dom = {
   for: '*',
   requires: [],
   ns: 'dom',
@@ -1238,12 +1251,12 @@ BrickUI.extensions.dom = {
     }
 
     if (!el) {
-      console.warn('BrickUI dom extension requires a DOM element (options.dom.element) or a valid options.dom.id', this.brick.id);
+      console.warn('VanillaBrick dom extension requires a DOM element (options.dom.element) or a valid options.dom.id', this.brick.id);
       return false;
     }
 
     if (elemOpt && !this._resolveElement(elemOpt)) {
-      console.warn('BrickUI dom element must be a DOM node or factory, not an id. Use options.dom.id to resolve by id.', this.brick.id);
+      console.warn('VanillaBrick dom element must be a DOM node or factory, not an id. Use options.dom.id to resolve by id.', this.brick.id);
     }
 
     this.brick.options.set('dom.element', el);
@@ -1264,7 +1277,8 @@ BrickUI.extensions.dom = {
   }
 };
 
-BrickUI.extensions.columns = {
+
+VanillaBrick.extensions.columns = {
   for: ['grid'],
   requires: ['dom', 'store'],
   ns: 'columns',
@@ -1322,7 +1336,7 @@ BrickUI.extensions.columns = {
             const th = document.createElement('th');
             th.textContent = col.label || col.datafield || '';
             if (col.sortable && col.datafield) {
-              th.classList.add('bui-sortable');
+              th.classList.add('vb-sortable');
               th.addEventListener('click', (function (colDef) {
                 return function () {
                   brick.columns.sort(colDef.datafield, null);
@@ -1358,7 +1372,9 @@ BrickUI.extensions.columns = {
   }
 };
 
-BrickUI.extensions.rows = {
+
+
+VanillaBrick.extensions.rows = {
   for: ['grid'],
   requires: ['dom', 'store', 'columns'],
   ns: 'rows',
@@ -1429,6 +1445,7 @@ BrickUI.extensions.rows = {
   destroy: function () {}
 };
 
+
 const DATA_SAMPLE_ROWS = [
   { code: '1', name: 'one', key: 1 },
   { code: '2', name: 'two', key: 2 },
@@ -1452,7 +1469,7 @@ const DATA_SAMPLE_ROWS = [
   { code: '20', name: 'twenty', key: 20 },
 ];
 
-BrickUI.extensions.store = {
+VanillaBrick.extensions.store = {
   for: ['form', 'grid'],
   requires: [],
   ns: 'store',
@@ -1568,56 +1585,9 @@ BrickUI.extensions.store = {
   destroy: function () {}
 };
 
-  BrickUI.extensions.dataStore = {
-    name: 'data',
-    for: ['form', 'grid'],
-    ns: 'data',
-    api: {
-        load: function(){
 
-        },
-        set: function(){
 
-        }
-    },
-    listeners: [
-        { 
-            for: 'data:sort:*',
-            phases: {
-                on: function(){
-
-                }
-            }
-        }
-    ],
-    events:[
-        {
-            for:'data:sort:*',
-            before: {
-                fn: function(){
-
-                },
-                priority:5,
-            },
-            on: {
-                fn: function(){
-
-                },
-                priority:5,
-            }
-        }
-    ],
-    private: {
-        private1: function(){
-
-        },
-        private2: function(){
-
-        }
-    },    
-  }
-
-  BrickUI.base = BrickUI.base || {};
+  VanillaBrick.base = VanillaBrick.base || {};
 
   const registry = {
     list: [],
@@ -1658,7 +1628,7 @@ BrickUI.extensions.store = {
       element: el
     };
 
-    const brick = new BrickUI.brick(opts);
+    const brick = new VanillaBrick.brick(opts);
 
     el.__brickInstance = brick;
     registry.list.push(brick);
@@ -1672,7 +1642,7 @@ BrickUI.extensions.store = {
     const scope = root || document;
     if (!scope.querySelectorAll) return [];
 
-    const nodes = scope.querySelectorAll('.bui');
+    const nodes = scope.querySelectorAll('.vb');
     const created = [];
 
     for (let i = 0; i < nodes.length; i++) {
@@ -1683,10 +1653,10 @@ BrickUI.extensions.store = {
     return created;
   }
 
-  BrickUI.base.bootstrap = bootstrap;
-  BrickUI.runtime = BrickUI.runtime || {};
-  BrickUI.runtime.bricks = registry.list || [];
-  BrickUI.base.getBrick = function (id) {
+  VanillaBrick.base.bootstrap = bootstrap;
+  VanillaBrick.runtime = VanillaBrick.runtime || {};
+  VanillaBrick.runtime.bricks = registry.list || [];
+  VanillaBrick.base.getBrick = function (id) {
     return registry.byId[id] || null;
   };
 
@@ -1708,4 +1678,7 @@ BrickUI.extensions.store = {
     }
   }
 
-})(window.BrickUI);
+
+
+})(window.VanillaBrick);
+

@@ -1,4 +1,4 @@
-BrickUI.extensions.rows = {
+VanillaBrick.extensions.rows = {
   for: ['grid'],
   requires: ['dom', 'store', 'columns'],
   ns: 'rows',
@@ -68,3 +68,4 @@ BrickUI.extensions.rows = {
 
   destroy: function () {}
 };
+

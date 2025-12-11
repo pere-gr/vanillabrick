@@ -210,6 +210,9 @@
     return this;
   };
 
+  // Compat: alias set -> setAsync
+  OptionsController.prototype.set = OptionsController.prototype.setAsync;
+
   /**
    * Set sense emetre events.
    * @param {string|Object} key
@@ -334,5 +337,6 @@
     }
   }
 
-  BrickUI.controllers = BrickUI.controllers || {};
-  BrickUI.controllers.options = OptionsController;
+  VanillaBrick.controllers = VanillaBrick.controllers || {};
+  VanillaBrick.controllers.options = OptionsController;
+

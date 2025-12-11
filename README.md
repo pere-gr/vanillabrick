@@ -1,6 +1,6 @@
-# BrickUI
+# VanillaBrick
 
-BrickUI is an experimental **vanilla-JavaScript UI micro-framework** built around “bricks”:
+VanillaBrick is an experimental **vanilla-JavaScript UI micro-framework** built around “bricks”:
 small, self-contained components (grids, forms, background services, etc.) wired together by
 a powerful event bus and an extensible plugin system.
 
@@ -11,13 +11,13 @@ a powerful event bus and an extensible plugin system.
 
 ---
 
-## Why BrickUI?
+## Why VanillaBrick?
 
 Most component libraries give you lots of widgets but very little control over what happens
 **before** and **after** something changes. You usually get a single callback (`onChange`),
 often at the wrong time, and then you’re fighting the framework.
 
-BrickUI is an experiment to flip that around:
+VanillaBrick is an experiment to flip that around:
 
 - Every interesting thing is an **event** with 3 phases: `before` → `on` → `after`.
 - Events are named like `namespace:action:target` and can use wildcards.
@@ -31,7 +31,7 @@ All of this runs on plain JS – no bundler required to *use* it.
 ## Features (current snapshot)
 
 - **Vanilla JS only**  
-  Single runtime file: `dist/brickui.js`. No React, no jQuery, no external deps.
+  Single runtime file: `dist/VanillaBrick.js`. No React, no jQuery, no external deps.
 
 - **Bricks (with or without DOM)**  
   Each brick has:
@@ -61,14 +61,14 @@ All of this runs on plain JS – no bundler required to *use* it.
     - `init` / `destroy`: lifecycle hooks.
 
 - **Auto-bootstrap from the DOM (optional)**  
-  Any element with `class="bui"` becomes a brick; the `kind` is read from
+  Any element with `class="vb"` becomes a brick; the `kind` is read from
   `brick-kind`, `data-kind` or `data-brick-kind`. The `dom` extension is wired
   automatically with the element as the brick’s root.
 
   This is just a convenience for **UI bricks**.  
   You can also create bricks manually from JS for **headless bricks / services**.
 
-- **Grid demo** [(work in progress)](https://pere-gr.github.io/brickui/)  
+- **Grid demo** [(work in progress)](https://pere-gr.github.io/vanillabrick/)  
   - `grid` brick kind.  
   - `columns` extension: header rendering + sorting.  
   - `rows` extension: body rendering.  
@@ -82,8 +82,8 @@ All of this runs on plain JS – no bundler required to *use* it.
 Clone the repo and open the demo HTML file:
 
 ```bash
-git clone https://github.com/pere-gr/brickui.git
-cd brickui
+git clone https://github.com/pere-gr/VanillaBrick.git
+cd VanillaBrick
 # open index.html in a browser
 ```
 
@@ -94,20 +94,20 @@ Minimal example (adapted from the demo):
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>BrickUI demo</title>
+  <title>VanillaBrick demo</title>
 
   <!-- Demo styles only -->
   <link rel="stylesheet" href="./demos/demo.css" />
 
-  <!-- BrickUI runtime -->
-  <script defer src="./dist/brickui.js"></script>
+  <!-- VanillaBrick runtime -->
+  <script defer src="./dist/VanillaBrick.js"></script>
   <!-- Optional: your own script (to set options, etc.) -->
   <script defer src="./demos/demo.js"></script>
 </head>
 <body>
-  <h1>BrickUI demo</h1>
+  <h1>VanillaBrick demo</h1>
 
-  <table id="grid1" class="bui bui-grid" brick-kind="grid">
+  <table id="grid1" class="vb vb-grid" brick-kind="grid">
     <thead></thead>
     <tbody></tbody>
   </table>
@@ -115,17 +115,17 @@ Minimal example (adapted from the demo):
 </html>
 ```
 
-When the DOM is ready, BrickUI automatically:
+When the DOM is ready, VanillaBrick automatically:
 
-1. Finds `.bui` elements.
-2. Creates a `BrickUI.brick` for each one.
+1. Finds `\.vb` elements.
+2. Creates a `VanillaBrick.brick` for each one.
 3. Applies all matching extensions (dom, store, grid, columns, rows, …).
 4. Fires `brick:ready:*`.
 
 You can then grab the instance from JS:
 
 ```js
-const grid = BrickUI.base.getBrick('grid1');
+const grid = VanillaBrick.base.getBrick('grid1');
 grid.columns.sort('code');        // triggers a store:data:sort event
 grid.store.set(newRowsArray);     // triggers store:data:set + re-render
 ```
@@ -141,14 +141,14 @@ headless bricks used purely as services.
 
 ```js
 // UI brick bound to a DOM element
-const grid = new BrickUI.brick({
+const grid = new VanillaBrick.brick({
   id: 'grid1',
   kind: 'grid',
   dom: { id: 'grid1' }
 });
 
 // Headless brick (no DOM), e.g. a service
-const service = new BrickUI.brick({
+const service = new VanillaBrick.brick({
   id: 'nexus-service',
   kind: 'service'
 });
@@ -219,7 +219,7 @@ Extensions also subscribe through their `events` definition (see next section).
 A typical extension looks like this (simplified):
 
 ```js
-BrickUI.extensions.columns = {
+VanillaBrick.extensions.columns = {
   for: ['grid'],
   requires: ['dom', 'store', 'grid'],
   ns: 'columns',
@@ -286,7 +286,7 @@ This list will change, but right now you’ll find things like:
 
 - `dom` – resolve the main DOM element for a brick and manage DOM event listeners.  
 - `domCss` – tiny helper layer: `brick.css.addClass`, `removeClass`, `show`, `hide`, `setStyle`, …  
-- `domEvents` – maps native DOM events to BrickUI events (click, mouseover, etc.).  
+- `domEvents` – maps native DOM events to VanillaBrick events (click, mouseover, etc.).  
 - `store` – basic in-memory data store for grids / forms (`store.data:*` events).  
 - `grid` – base grid behavior.  
 - `columns` – grid header rendering + sorting logic.  
@@ -324,7 +324,7 @@ is designed with this kind of service in mind.
 
 Short-term ideas:
 
-- Clean up / split the monolithic `dist/brickui.js` into smaller `src/*` modules.
+- Clean up / split the monolithic `dist/VanillaBrick.js` into smaller `src/*` modules.
 - Finish and document a stable **data store** API (remote / local data, paging hooks).
 - Add a simple **form** brick type reusing the same event / extension model.
 - Introduce the first **service bricks** (Nexus-style master/detail wiring).
@@ -335,7 +335,7 @@ Short-term ideas:
 Non-goals (for now):
 
 - No JSX / virtual DOM.
-- No mandatory build step to *use* BrickUI (only to develop it).
+- No mandatory build step to *use* VanillaBrick (only to develop it).
 - No heavy theming engine – CSS classes + small helpers should be enough.
 
 ---
@@ -345,7 +345,7 @@ Non-goals (for now):
 Right now this is mostly a personal playground, but issues and suggestions are welcome.
 
 - Look at `/demos` for small examples.
-- Open `dist/brickui.js` if you want to see how the runtime works.
+- Open `dist/VanillaBrick.js` if you want to see how the runtime works.
 - New extensions are the best way to experiment:
   - pick a `kind`,
   - declare `for` / `requires` / `ns`,
@@ -356,3 +356,7 @@ Right now this is mostly a personal playground, but issues and suggestions are w
 ## License
 
 MIT – see [LICENSE](./LICENSE) for details.
+
+
+
+
