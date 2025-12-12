@@ -50,11 +50,11 @@ function Brick(options) {
   });
 
   controllers.extensions.applyAll();
-  controllers.events.fireAsync('brick:ready:*', { options: opts });
+  controllers.events.fireAsync('brick:ready:now', { options: opts });
 }
 
 Brick.prototype.destroy = function () {
-  this._controllers.events.fire('brick:destroy:*', {});
+  this._controllers.events.fire('brick:destroy:now', {});
 };
 
 Object.defineProperty(Brick, '_idCounter', {
@@ -259,14 +259,15 @@ VanillaBrick.components.grid = {
 
 
 
-  /**
-   * Per-brick event bus controller.
-   * Manages events shaped as "namespace:event:target" with phases before/on/after.
-   * @constructor
-   */
+/**
+ * Per-brick event bus controller.
+ * Manages events shaped as "namespace:event:target" with phases before/on/after.
+ * @constructor
+ */
 function EventBusController(brick) {
   this.brick = brick || null;
   this.handlers = []; // { pattern, compiled, phase, priority, handler }
+  this._dispatchCache = {};
   this.phases = ['before', 'on', 'after'];
 
   // Expose public EventBus API on the brick
@@ -292,202 +293,264 @@ function EventBusController(brick) {
   }
 }
 
-  // ---------- Internal utils ----------
+// ---------- Internal utils ----------
 
-  EventBusController.prototype._normalizePriority = function (priority) {
-    let pr = typeof priority === 'number' ? priority : 5;
-    if (pr < 0) pr = 0;
-    if (pr > 10) pr = 10;
-    return pr;
+EventBusController.prototype._normalizePriority = function (priority) {
+  let pr = typeof priority === 'number' ? priority : 5;
+  if (pr < 0) pr = 0;
+  if (pr > 10) pr = 10;
+  return pr;
+};
+
+/**
+ * Compiles a subscription pattern.
+ * Pattern format: "namespace:type:target"
+ * Supports '*' as wildcard in any position.
+ */
+EventBusController.prototype._compilePattern = function (pattern) {
+  const parts = (pattern || '').split(':');
+  const ns = parts[0];
+  const type = parts[1];
+  const target = parts[2];
+
+  return {
+    namespace: !ns || ns === '*' ? undefined : ns,
+    type: !type || type === '*' ? undefined : type,
+    target: !target || target === '*' ? undefined : target,
+  };
+};
+
+/**
+ * Parses an event name into its components.
+ * Format: "namespace:type:target"
+ */
+EventBusController.prototype._parseEventKey = function (eventName) {
+  const parts = (eventName || '').split(':');
+  return {
+    namespace: parts[0] || '',
+    type: parts[1] || '',
+    target: parts[2] || '',
+  };
+};
+
+EventBusController.prototype._matches = function (compiled, key) {
+  return (
+    (compiled.namespace === undefined || compiled.namespace === key.namespace) &&
+    (compiled.type === undefined || compiled.type === key.type) &&
+    (compiled.target === undefined || compiled.target === key.target)
+  );
+};
+
+EventBusController.prototype._validateEventName = function (eventName) {
+  if (typeof eventName !== 'string') {
+    console.error('[EventBus] Event name must be a string.', eventName);
+    return false;
+  }
+  const parts = eventName.split(':');
+
+  // Strict 3-segment rule
+  if (parts.length !== 3) {
+    console.error('[EventBus] Invalid event name format. Expected exactly "namespace:type:target" (3 segments). Got:', eventName);
+    return false;
+  }
+
+  // Validation for Dispatch: No empty parts, no wildcards allowed
+  if (!parts[0] || parts[0] === '*' || !parts[1] || parts[1] === '*' || !parts[2] || parts[2] === '*') {
+    console.error('[EventBus] Invalid event name for dispatch. Wildcards (*) and empty segments are not allowed in namespace, type, or target.', eventName);
+    return false;
+  }
+
+  return true;
+};
+
+/**
+ * Returns matched handlers grouped by phase for a specific event name.
+ * Uses caching. The cache key is the full eventName string.
+ */
+EventBusController.prototype._getHandlersForEvent = function (eventName) {
+  if (this._dispatchCache[eventName]) {
+    return this._dispatchCache[eventName];
+  }
+
+  const key = this._parseEventKey(eventName);
+  const result = {
+    before: [],
+    on: [],
+    after: []
   };
 
-  // pattern: "ns:event:target" with '*' as wildcard
-  EventBusController.prototype._compilePattern = function (pattern) {
-    const parts = (pattern || '').split(':');
-    const ns = parts[0] || '*';
-    const ev = parts[1] || '*';
-    const target = parts[2];
-
-    return {
-      namespace: ns === '*' ? undefined : ns,
-      event: ev === '*' ? undefined : ev,
-      target: !target || target === '*' ? undefined : target,
-    };
-  };
-
-  // eventName: "ns:event:target"
-  EventBusController.prototype._parseEventKey = function (eventName) {
-    const parts = (eventName || '').split(':');
-    return {
-      namespace: parts[0] || '',
-      event: parts[1] || '',
-      target: parts[2] || null,
-    };
-  };
-
-  EventBusController.prototype._matches = function (compiled, key) {
-    return (
-      (compiled.namespace === undefined || compiled.namespace === key.namespace) &&
-      (compiled.event === undefined || compiled.event === key.event) &&
-      (compiled.target === undefined || compiled.target === key.target)
-    );
-  };
-
-  // ---------- Subscription API ----------
-
-  /**
-   * Register a handler for a pattern and phase.
-   * pattern: "ns:event:target" (supports '*')
-   * phase: "before" | "on" | "after" (default "on")
-   * priority: 0..10 (default 5, 0 = highest priority)
-   */
-  EventBusController.prototype.on = function (pattern, phase, priority, handler, meta) {
-    // signature compatible: on(pattern, phase, priority, handler, meta)
-    // phase optional, priority optional, meta optional
-    if (typeof phase === 'function') {
-      meta = handler;
-      handler = phase;
-      phase = 'on';
-      priority = undefined;
-    } else if (typeof priority === 'function' && typeof handler !== 'function') {
-      meta = handler;
-      handler = priority;
-      priority = undefined;
-    }
-    if (typeof handler !== 'function') return;
-
-    let ph = phase || 'on';
-    if (this.phases.indexOf(ph) === -1) ph = 'on';
-
-    const pr = this._normalizePriority(priority);
-
-    this.handlers.push({
-      pattern: pattern,
-      compiled: this._compilePattern(pattern),
-      phase: ph,
-      handler: handler,
-      priority: pr,
-      meta: meta || null
-    });
-
-    // Sort by priority asc (0 = first)
-    this.handlers.sort(function (a, b) {
-      const pa = typeof a.priority === 'number' ? a.priority : 5;
-      const pb = typeof b.priority === 'number' ? b.priority : 5;
-      return pa - pb;
-    });
-  };
-
-  /**
-   * Unregister handlers filtered by pattern, phase and/or handler.
-   */
-  EventBusController.prototype.off = function (pattern, phase, handler) {
-    for (let i = this.handlers.length - 1; i >= 0; i -= 1) {
-      const h = this.handlers[i];
-      if (pattern && h.pattern !== pattern) continue;
-      if (phase && h.phase !== phase) continue;
-      if (handler && h.handler !== handler) continue;
-      this.handlers.splice(i, 1);
-    }
-  };
-
-  // ---------- Pipeline execution (async core) ----------
-
-  EventBusController.prototype._run = async function (eventName, payload) {
-    const key = this._parseEventKey(eventName);
-    const phases = this.phases;
-
-    // Event object shared across phases
-    const ev = {
-      brick: this.brick || null,
-      cancel: false, // if true, skip "on" phase
-      data: payload,
-      errors: [], // collected handler errors
-      event:{
-        phase: null, // "before" | "on" | "after"
-        name: eventName, // "ns:event:target"
-        namespace: key.namespace,
-        event: key.event,
-        target: key.target,
-      },
-      stopPhase: false, // if true, stop the current phase loop
-    };
-
-    for (let p = 0; p < phases.length; p += 1) {
-      const phase = phases[p];
-
-      // if canceled, skip "on" phase but still run others
-      if (phase === 'on' && ev.cancel) continue;
-
-      ev.event.phase = phase;
-
-      for (let i = 0; i < this.handlers.length; i += 1) {
-        const h = this.handlers[i];
-
-        if (h.phase !== phase) continue;
-        if (!this._matches(h.compiled, key)) continue;
-        if (ev.stopPhase) break;
-
-        try {
-          const r = h.handler(ev, { brick: this.brick });
-          if (r && typeof r.then === 'function') {
-            await r; // support async handlers
-          }
-        } catch (err) {
-          console.error('Error in handler', h.handler, { pattern: h.pattern, phase: h.phase, meta: h.meta }, err);
-          ev.errors.push({ error: err, meta: h.meta, pattern: h.pattern, phase: h.phase });
-          // on handler error, force cancel
-          ev.cancel = true;
-        }
+  // this.handlers is expected to be sorted by priority globally
+  for (let i = 0; i < this.handlers.length; i += 1) {
+    const h = this.handlers[i];
+    if (this._matches(h.compiled, key)) {
+      if (result[h.phase]) {
+        result[h.phase].push(h);
       }
     }
-
-    return ev;
-  };
-
-  // ---------- Public API ----------
-
-  /**
-   * Fire-and-forget event.
-   * eventName: "ns:event:target"
-   */
-  EventBusController.prototype.fire = function (eventName, payload) {
-    // Fire-and-forget; use fireAsync() if you need the final event object.
-    this._run(eventName, payload);
-  };
-
-  /**
-   * Fire an event and get a Promise with the final event object
-   * (to inspect cancel/errors/meta).
-   */
-  EventBusController.prototype.fireAsync = function (eventName, payload) {
-    return this._run(eventName, payload);
-  };
-
-  // ---------- Hook to global namespace ----------
-
-  VanillaBrick.controllers = VanillaBrick.controllers || {};
-  VanillaBrick.controllers.events = EventBusController;
-
-
-function matchesFor(def, brick) {
-  const rule = def.for || def._for;
-  if (!rule) return true;
-  if (rule === '*') return true;
-  if (typeof rule === 'string') return rule === brick.kind;
-  if (Array.isArray(rule)) return rule.indexOf(brick.kind) !== -1;
-  return false;
-}
-
-function requiresMet(def, brick) {
-  const reqs = def.requires || def._requires;
-  if (!reqs || !reqs.length) return true;
-  for (let i = 0; i < reqs.length; i += 1) {
-    const ns = reqs[i];
-    if (!brick[ns]) return false;
   }
-  return true;
-}
+
+  this._dispatchCache[eventName] = result;
+  return result;
+};
+
+// ---------- Subscription API ----------
+
+/**
+ * Register a handler for a pattern and phase.
+ * pattern: "namespace:type:target" (supports '*')
+ * phase: "before" | "on" | "after" (default "on")
+ * priority: 0..10 (default 5, 0 = highest priority)
+ */
+EventBusController.prototype.on = function (pattern, phase, priority, handler, meta) {
+  // Signature compatibility: on(pattern, phase, priority, handler, meta)
+  // Optional args shifting
+  if (typeof phase === 'function') {
+    meta = handler;
+    handler = phase;
+    phase = 'on';
+    priority = undefined;
+  } else if (typeof priority === 'function' && typeof handler !== 'function') {
+    meta = handler;
+    handler = priority;
+    priority = undefined;
+  }
+  if (typeof handler !== 'function') return;
+
+  let ph = phase || 'on';
+  if (this.phases.indexOf(ph) === -1) ph = 'on';
+
+  const pr = this._normalizePriority(priority);
+
+  this.handlers.push({
+    pattern: pattern,
+    compiled: this._compilePattern(pattern),
+    phase: ph,
+    handler: handler,
+    priority: pr,
+    meta: meta || null
+  });
+
+  // Sort by priority asc (0 = first)
+  this.handlers.sort(function (a, b) {
+    const pa = typeof a.priority === 'number' ? a.priority : 5;
+    const pb = typeof b.priority === 'number' ? b.priority : 5;
+    return pa - pb;
+  });
+
+  // Invalidate cache on any subscription change
+  this._dispatchCache = {};
+};
+
+/**
+ * Unregister handlers filtered by pattern, phase and/or handler.
+ */
+EventBusController.prototype.off = function (pattern, phase, handler) {
+  for (let i = this.handlers.length - 1; i >= 0; i -= 1) {
+    const h = this.handlers[i];
+    if (pattern && h.pattern !== pattern) continue;
+    if (phase && h.phase !== phase) continue;
+    if (handler && h.handler !== handler) continue;
+    this.handlers.splice(i, 1);
+  }
+  // Invalidate cache on any unsubscription
+  this._dispatchCache = {};
+};
+
+// ---------- Pipeline execution (async core) ----------
+
+EventBusController.prototype._run = async function (eventName, payload) {
+  // 1. Validation
+  if (!this._validateEventName(eventName)) {
+    // Return a dummy error object so awaits don't crash, but do not process
+    return {
+      event: { name: eventName },
+      errors: [{ error: 'Invalid event name format or wildcards in dispatch' }],
+      cancel: true
+    };
+  }
+
+  // 2. Cache Lookup
+  const phases = this.phases;
+  const handlersByPhase = this._getHandlersForEvent(eventName);
+
+  // We parse again just to populate the event meta object accurately
+  const key = this._parseEventKey(eventName);
+
+  // 3. Event Object Construction
+  const ev = {
+    brick: this.brick || null,
+    cancel: false, // if true, skip "on" phase
+    data: payload,
+    errors: [], // collected handler errors
+    event: {
+      phase: null, // "before" | "on" | "after"
+      name: eventName,
+      namespace: key.namespace,
+      type: key.type,   // Renamed from 'event' to 'type'
+      target: key.target,
+    },
+    stopPhase: false, // if true, stop the current phase loop
+  };
+
+  // 4. Execution Loop
+  for (let p = 0; p < phases.length; p += 1) {
+    const phase = phases[p];
+
+    // If canceled, skip "on" phase, but continue to "after"
+    if (phase === 'on' && ev.cancel) continue;
+
+    ev.event.phase = phase;
+    const phaseHandlers = handlersByPhase[phase] || [];
+
+    for (let i = 0; i < phaseHandlers.length; i += 1) {
+      if (ev.stopPhase) break;
+
+      const h = phaseHandlers[i];
+
+      try {
+        // Pass event and context
+        const r = h.handler(ev, { brick: this.brick });
+        if (r && typeof r.then === 'function') {
+          await r; // support async handlers
+        }
+      } catch (err) {
+        console.error('Error in handler', h.handler, { pattern: h.pattern, phase: h.phase, meta: h.meta }, err);
+        ev.errors.push({ error: err, meta: h.meta, pattern: h.pattern, phase: h.phase });
+        // Force cancel on error to prevent inconsistent state
+        ev.cancel = true;
+      }
+    }
+  }
+
+  return ev;
+};
+
+// ---------- Public API ----------
+
+/**
+ * Fire-and-forget event.
+ * eventName: "namespace:type:target"
+ */
+EventBusController.prototype.fire = function (eventName, payload) {
+  // Fire-and-forget; use fireAsync() if you need the final event object.
+  this._run(eventName, payload);
+};
+
+/**
+ * Fire an event and get a Promise with the final event object
+ * (to inspect cancel/errors/meta).
+ */
+EventBusController.prototype.fireAsync = function (eventName, payload) {
+  return this._run(eventName, payload);
+};
+
+// ---------- Hook to global namespace ----------
+
+VanillaBrick.controllers = VanillaBrick.controllers || {};
+VanillaBrick.controllers.events = EventBusController;
+
+
+
 
 function parseForPattern(pattern) {
   if (!pattern) return { ns: '', action: '', target: '*' };
@@ -509,43 +572,16 @@ ExtensionsController.prototype.applyAll = function () {
   const registry = VanillaBrick.controllers.extensionsRegistry;
   if (!registry || typeof registry.all !== 'function') return;
 
-  const defs = registry.all() || [];
-  if (!defs.length) return;
+  // Now registry returns a filtered, sorted, valid list
+  const defs = registry.all(this.brick) || [];
 
-  const pending = defs.slice();
-  let loops = 0;
-  const maxLoops = 20;
-
-  while (pending.length && loops < maxLoops) {
-    loops += 1;
-    let progressed = false;
-
-    for (let i = pending.length - 1; i >= 0; i -= 1) {
-      const def = pending[i];
-      if (!def) {
-        pending.splice(i, 1);
-        progressed = true;
-        continue;
-      }
-
-      if (!matchesFor(def.ext, this.brick)) {
-        pending.splice(i, 1);
-        progressed = true;
-        continue;
-      }
-
-      if (!requiresMet(def.ext, this.brick)) continue;
-
-      this._install(def);
-      pending.splice(i, 1);
-      progressed = true;
-    }
-
-    if (!progressed) break;
+  if (defs.length == 0) {
+    console.warn("No extensions found for this brick", this.brick);
+    return;
   }
 
-  if (pending.length) {
-    console.warn('VanillaBrick extensions not installed due to unmet requirements', pending);
+  for (let i = 0; i < defs.length; i += 1) {
+    this._install(defs[i]);
   }
 
   this._ensureDestroyHook();
@@ -743,377 +779,475 @@ ExtensionsController.prototype._ensureDestroyHook = function () {
 VanillaBrick.controllers.extensions = ExtensionsController;
 
 
-  // Diccionari de definicions d'extensions:
-  //   VanillaBrick.extensions.myExt = { ns: "myExt", ... }
-  VanillaBrick.extensions = VanillaBrick.extensions || {};
+// Diccionari de definicions d'extensions:
+//   VanillaBrick.extensions.myExt = { ns: "myExt", ... }
+VanillaBrick.extensions = VanillaBrick.extensions || {};
 
-  // Petit helper de registre/base
-  // (ara mateix només serveix per obtenir totes les definicions)
-  VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extensionsRegistry || {
-    /**
-     * Retorna un array amb totes les definicions d'extensions
-     * definides a VanillaBrick.extensions.*
-     */
-    all: function () {
-      const list = [];
-      const src = VanillaBrick.extensions || {};
-      for (const key in src) {
-        if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
-        const def = src[key];
-        if (!def || typeof def !== 'object') continue;
-
-        // Si no té _name, fem servir ns o la clau
-        if (!def._name) def._name = def.ns || key;
-
-        list.push({name: key, ext: def});
-      }
-      return list;
-    }
-  };
-
-
-
+// Petit helper de registre/base
+// (ara mateix només serveix per obtenir totes les definicions)
+VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extensionsRegistry || {
   /**
-   * Per-brick options controller.
-   * Guarda valors en objectes nested segons rutes amb punts,
-   * mantenint compatibilitat de lectura amb claus planes.
-   * @constructor
-   * @param {Object} brick
-   * @param {Object} initial
+   * Retorna un array amb totes les definicions d'extensions
+   * definides a VanillaBrick.extensions.*
    */
-  function OptionsController(brick, initial) {
-    this.brick = brick;
-    this.data = {};
-    this._eventsBound = false;
-
-    if (initial && typeof initial === 'object') {
-      for (const k in initial) {
-        if (Object.prototype.hasOwnProperty.call(initial, k)) {
-          setPath(this.data, toPath(k), initial[k]);
-        }
-      }
-    }
-
-    var ctrl = this;
-
-    // API pública al brick
-    brick.options = {
-      get: function (key, fallback) {
-        return ctrl.get(key, fallback);
-      },
-
-      // Síncron: dispara events via fire()
-      set: function (key, value) {
-        ctrl.setSync(key, value);
-        return brick;
-      },
-
-      // Async: dispara events via fireAsync()
-      setAsync: async function (key, value) {
-        await ctrl.setAsync(key, value);
-        return brick; // permet await brick.options.setAsync(...); i chaining
-      },
-
-      has: function (key) {
-        return ctrl.has(key);
-      },
-
-      all: function () {
-        return ctrl.all();
-      },
-
-      setSilent: function (key, value) {
-        ctrl.setSilent(key, value);
-        return brick; // chaining
-      }
-    };
-  }
+  _cache: {},
 
   /**
-   * Registra el handler _apply al bus d'events
-   * per a la fase "on" de "options:value:*".
-   * Només es fa un cop.
-   */
-  OptionsController.prototype._ensureEventsBinding = function () {
-    if (this._eventsBound) return;
-
-    var brick = this.brick;
-    var self = this;
-
-    // Confies en la arquitectura: brick.events i on() EXISTEIXEN.
-    brick.events.on('options:value:*', 'on', 5, function (ev) {
-      self._apply(ev);
-    });
-
-    this._eventsBound = true;
-  };
-
-  /**
-   * Handler de fase "on" per "options:value:*".
-   * Aplica els canvis a this.data a partir de ev.data.
+   * Retorna un array amb totes les definicions d'extensions
+   * filtrades per brick kind i amb dependències resoltes (topological sort).
    *
-   * Shape assumit:
-   *  - single: { key, value, previous, options, brick }
-   *  - batch:  { batch:true, values:{...}, previous:{...}, options, brick }
-   *
-   * @param {Object} ev - event del EventBus
+   * @param {Object} brick - Instancia del brick o objecte de metadates {kind: '...'}
    */
-  OptionsController.prototype._apply = function (ev) {
-    if (!ev) return;
-    var payload = ev.data || {};
-
-    // Batch: set({ a:1, b:2 }) / set({ dom:{id:'x'} })
-    if (payload.batch && payload.values && typeof payload.values === 'object') {
-      for (var k in payload.values) {
-        if (Object.prototype.hasOwnProperty.call(payload.values, k)) {
-          setPath(this.data, toPath(k), payload.values[k]);
-        }
-      }
-      return;
+  all: function (brick) {
+    if (!brick || typeof brick !== 'object') {
+      // Legacy/Fallback: return everything if no context is provided
+      // (Though plan said strictly require it, we can fallback to old behavior or empty)
+      // Let's stick strictly to plan: Empty or try to work?
+      // User said "early-alpha i ens podem carregar el que volguem".
+      // Let's return empty or warn. Returning empty is safer.
+      console.warn('ExtensionsRegistry.all() called without brick context');
+      return [];
     }
 
-    // Single: set('foo', 123)
-    if (typeof payload.key === 'string') {
-      setPath(this.data, toPath(payload.key), payload.value);
+    const kind = brick.kind;
+    if (!kind) return [];
+
+    if (this._cache[kind]) {
+      return this._cache[kind];
     }
-  };
 
-  /**
-   * Set a value or merge an object, disparant events options:value.
-   * Sempre usa fireAsync per permetre handlers async.
-   *
-   * @param {string|Object} key
-   * @param {any} value
-   * @returns {Promise<OptionsController>}
-   */
-  OptionsController.prototype.setAsync = async function (key, value) {
-    this._ensureEventsBinding();
+    const src = VanillaBrick.extensions || {};
+    const candidates = {};
 
-    var brick = this.brick;
+    // 1. Initial Filter by Kind (and prepare candidates map)
+    for (const key in src) {
+      if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
+      const def = src[key];
+      if (!def || typeof def !== 'object') continue;
 
-    // OBJECTE: set({ a:1, b:2 }) (pot incloure nested)
-    if (key && typeof key === 'object' && !Array.isArray(key)) {
-      var values = {};
-      var previous = {};
+      // Normalitzar el nom intern
+      if (!def._name) def._name = def.ns || key;
 
-      flattenEntries(key, '', values);
+      // Check 'for' rule
+      const rule = def.for || def._for;
+      let match = false;
 
-      for (var vk in values) {
-        if (!Object.prototype.hasOwnProperty.call(values, vk)) continue;
-        previous[vk] = getWithFallback(this.data, vk);
+      if (!rule || rule === '*') {
+        match = true;
+      } else if (typeof rule === 'string') {
+        match = (rule === kind);
+      } else if (Array.isArray(rule)) {
+        match = (rule.indexOf(kind) !== -1);
       }
 
-      var batchPayload = {
-        batch: true,
-        values: values,
-        previous: previous,
-        options: this,
-        brick: brick
-      };
-
-      // sense target: "options:value:"
-      await brick.events.fireAsync('options:value:', batchPayload);
-      return this;
-    }
-
-    // SINGLE: set('theme', 'dark')
-    var oldValue = getWithFallback(this.data, key);
-
-    var payload = {
-      key: key,
-      value: value,
-      previous: oldValue,
-      options: this,
-      brick: brick
-    };
-
-    // amb target: "options:value:<key>"
-    await brick.events.fireAsync('options:value:' + key, payload);
-    return this;
-  };
-
-  /**
-   * Set a value or merge an object, disparant events options:value de forma síncrona.
-   * @param {string|Object} key
-   * @param {any} value
-   * @returns {OptionsController}
-   */
-  OptionsController.prototype.setSync = function (key, value) {
-    this._ensureEventsBinding();
-
-    var brick = this.brick;
-
-    // OBJECTE: set({ a:1, b:2 }) (pot incloure nested)
-    if (key && typeof key === 'object' && !Array.isArray(key)) {
-      var values = {};
-      var previous = {};
-
-      flattenEntries(key, '', values);
-
-      for (var vk in values) {
-        if (!Object.prototype.hasOwnProperty.call(values, vk)) continue;
-        previous[vk] = getWithFallback(this.data, vk);
+      if (match) {
+        candidates[key] = { name: key, ext: def };
       }
-
-      var batchPayload = {
-        batch: true,
-        values: values,
-        previous: previous,
-        options: this,
-        brick: brick
-      };
-
-      // sense target: "options:value:"
-      brick.events.fire('options:value:', batchPayload);
-      return this;
     }
 
-    // SINGLE: set('theme', 'dark')
-    var oldValue = getWithFallback(this.data, key);
+    // 2. Recursive Validation & Topological Sort (DFS)
+    const sortedList = [];
+    // Status: undefined (unvisited), 'visiting', 'ok', 'missing'
+    const status = {};
 
-    var payload = {
-      key: key,
-      value: value,
-      previous: oldValue,
-      options: this,
-      brick: brick
-    };
+    function visit(name) {
+      if (status[name] === 'ok') return true;
+      if (status[name] === 'visiting') return false; // Cycle detection
+      if (status[name] === 'missing') return false;
 
-    // amb target: "options:value:<key>"
-    brick.events.fire('options:value:' + key, payload);
-    return this;
-  };
-
-  // Compat: alias set -> setAsync
-  OptionsController.prototype.set = OptionsController.prototype.setAsync;
-
-  /**
-   * Set sense emetre events.
-   * @param {string|Object} key
-   * @param {any} value
-   * @returns {OptionsController}
-   */
-  OptionsController.prototype.setSilent = function (key, value) {
-    // OBJECTE: setSilent({ a:1, b:2 })
-    if (key && typeof key === 'object' && !Array.isArray(key)) {
-      flattenEntries(key, '', this.data);
-      return this;
-    }
-
-    // SINGLE: setSilent('foo', 123)
-    setPath(this.data, toPath(key), value);
-    return this;
-  };
-
-  /**
-   * Get a value by key or return fallback.
-   * @param {string} key
-   * @param {any} fallback
-   * @returns {any}
-   */
-  OptionsController.prototype.get = function (key, fallback) {
-    var val = getWithFallback(this.data, key);
-    return typeof val === 'undefined' ? fallback : val;
-  };
-
-  /**
-   * Indica si la clau existeix.
-   * @param {string} key
-   * @returns {boolean}
-   */
-  OptionsController.prototype.has = function (key) {
-    var path = toPath(key);
-    if (!path.length) return false;
-    var nested = hasPath(this.data, path);
-    if (nested) return true;
-    // compatibilitat: clau plana
-    return Object.prototype.hasOwnProperty.call(this.data, key);
-  };
-
-  /**
-   * Retorna una còpia superficial de totes les opcions.
-   * @returns {Object}
-   */
-  OptionsController.prototype.all = function () {
-    return Object.assign({}, this.data);
-  };
-
-  // Helpers per gestionar claus amb punts com a rutes nested
-  function toPath(key) {
-    if (!key && key !== 0) return [];
-    if (Array.isArray(key)) return key;
-    return String(key)
-      .split('.')
-      .filter(function (p) { return p !== ''; });
-  }
-
-  function setPath(obj, path, value) {
-    if (!path.length) return;
-    var cur = obj;
-    for (var i = 0; i < path.length - 1; i += 1) {
-      var seg = path[i];
-      if (!cur[seg] || typeof cur[seg] !== 'object') {
-        cur[seg] = {};
-      }
-      cur = cur[seg];
-    }
-    cur[path[path.length - 1]] = value;
-  }
-
-  function getPath(obj, path) {
-    var cur = obj;
-    for (var i = 0; i < path.length; i += 1) {
-      var seg = path[i];
-      if (!cur || !Object.prototype.hasOwnProperty.call(cur, seg)) {
-        return undefined;
-      }
-      cur = cur[seg];
-    }
-    return cur;
-  }
-
-  function hasPath(obj, path) {
-    var cur = obj;
-    for (var i = 0; i < path.length; i += 1) {
-      var seg = path[i];
-      if (!cur || !Object.prototype.hasOwnProperty.call(cur, seg)) {
+      const candidate = candidates[name];
+      if (!candidate) {
+        status[name] = 'missing';
         return false;
       }
-      cur = cur[seg];
-    }
-    return true;
-  }
 
-  function getWithFallback(data, key) {
-    var path = toPath(key);
-    if (path.length) {
-      var nested = getPath(data, path);
-      if (typeof nested !== 'undefined') return nested;
-    }
-    // compatibilitat amb claus planes existents
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
-      return data[key];
-    }
-    return undefined;
-  }
+      status[name] = 'visiting';
 
-  // Extreu claus de tipus objecte en forma de "a.b": valor
-  function flattenEntries(src, prefix, target) {
-    for (var k in src) {
-      if (!Object.prototype.hasOwnProperty.call(src, k)) continue;
-      var path = prefix ? prefix + '.' + k : k;
-      var val = src[k];
-      if (val && typeof val === 'object' && !Array.isArray(val)) {
-        flattenEntries(val, path, target);
-      } else {
-        target[path] = val;
+      const reqs = candidate.ext.requires || candidate.ext._requires;
+      if (Array.isArray(reqs)) {
+        for (let i = 0; i < reqs.length; i++) {
+          const depName = reqs[i];
+          if (!visit(depName)) {
+            status[name] = 'missing'; // Dependency failed
+            return false;
+          }
+        }
+      }
+
+      status[name] = 'ok';
+      sortedList.push(candidate);
+      return true;
+    }
+
+    for (const name in candidates) {
+      visit(name);
+    }
+
+    this._cache[kind] = sortedList;
+    return sortedList;
+  }
+};
+
+
+
+/**
+ * Per-brick options controller.
+ * Guarda valors en objectes nested segons rutes amb punts,
+ * mantenint compatibilitat de lectura amb claus planes.
+ * @constructor
+ * @param {Object} brick
+ * @param {Object} initial
+ */
+function OptionsController(brick, initial) {
+  this.brick = brick;
+  this.data = {};
+  this._cache = {}; // Cache for O(1) reads
+  this._eventsBound = false;
+
+  if (initial && typeof initial === 'object') {
+    for (const k in initial) {
+      if (Object.prototype.hasOwnProperty.call(initial, k)) {
+        setPath(this.data, toPath(k), initial[k]);
       }
     }
   }
 
-  VanillaBrick.controllers = VanillaBrick.controllers || {};
-  VanillaBrick.controllers.options = OptionsController;
+  var ctrl = this;
 
+  // API pública al brick
+  brick.options = {
+    get: function (key, fallback) {
+      return ctrl.get(key, fallback);
+    },
+
+    // Síncron: dispara events via fire()
+    set: function (key, value) {
+      ctrl.setSync(key, value);
+      return brick;
+    },
+
+    // Async: dispara events via fireAsync()
+    setAsync: async function (key, value) {
+      await ctrl.setAsync(key, value);
+      return brick; // permet await brick.options.setAsync(...); i chaining
+    },
+
+    has: function (key) {
+      return ctrl.has(key);
+    },
+
+    all: function () {
+      return ctrl.all();
+    },
+
+    setSilent: function (key, value) {
+      ctrl.setSilent(key, value);
+      return brick; // chaining
+    }
+  };
+}
+
+/**
+ * Registra el handler _apply al bus d'events
+ * per a la fase "on" de "options:value:*".
+ * Només es fa un cop.
+ */
+OptionsController.prototype._ensureEventsBinding = function () {
+  if (this._eventsBound) return;
+
+  var brick = this.brick;
+  var self = this;
+
+  // Confies en la arquitectura: brick.events i on() EXISTEIXEN.
+  brick.events.on('options:value:*', 'on', 5, function (ev) {
+    self._apply(ev);
+  });
+
+  this._eventsBound = true;
+};
+
+/**
+ * Handler de fase "on" per "options:value:*".
+ * Aplica els canvis a this.data a partir de ev.data.
+ *
+ * Shape assumit:
+ *  - single: { key, value, previous, options, brick }
+ *  - batch:  { batch:true, values:{...}, previous:{...}, options, brick }
+ *
+ * @param {Object} ev - event del EventBus
+ */
+OptionsController.prototype._apply = function (ev) {
+  if (!ev) return;
+  var payload = ev.data || {};
+
+  // Invalidate cache on any update
+  this._cache = {};
+
+  // Batch: set({ a:1, b:2 }) / set({ dom:{id:'x'} })
+  if (payload.batch && payload.values && typeof payload.values === 'object') {
+    for (var k in payload.values) {
+      if (Object.prototype.hasOwnProperty.call(payload.values, k)) {
+        setPath(this.data, toPath(k), payload.values[k]);
+      }
+    }
+    return;
+  }
+
+  // Single: set('foo', 123)
+  if (typeof payload.key === 'string') {
+    setPath(this.data, toPath(payload.key), payload.value);
+  }
+};
+
+/**
+ * Set a value or merge an object, disparant events options:value.
+ * Sempre usa fireAsync per permetre handlers async.
+ *
+ * @param {string|Object} key
+ * @param {any} value
+ * @returns {Promise<OptionsController>}
+ */
+OptionsController.prototype.setAsync = async function (key, value) {
+  this._ensureEventsBinding();
+
+  var brick = this.brick;
+
+  // OBJECTE: set({ a:1, b:2 }) (pot incloure nested)
+  if (key && typeof key === 'object' && !Array.isArray(key)) {
+    var values = {};
+    var previous = {};
+
+    flattenEntries(key, '', values);
+
+    for (var vk in values) {
+      if (!Object.prototype.hasOwnProperty.call(values, vk)) continue;
+      previous[vk] = getWithFallback(this.data, vk);
+    }
+
+    var batchPayload = {
+      batch: true,
+      values: values,
+      previous: previous,
+      options: this,
+      brick: brick
+    };
+
+    // sense target: "options:value:"
+    await brick.events.fireAsync('options:value:', batchPayload);
+    return this;
+  }
+
+  // SINGLE: set('theme', 'dark')
+  var oldValue = getWithFallback(this.data, key);
+
+  var payload = {
+    key: key,
+    value: value,
+    previous: oldValue,
+    options: this,
+    brick: brick
+  };
+
+  // amb target: "options:value:<key>"
+  await brick.events.fireAsync('options:value:' + key, payload);
+  return this;
+};
+
+/**
+ * Set a value or merge an object, disparant events options:value de forma síncrona.
+ * @param {string|Object} key
+ * @param {any} value
+ * @returns {OptionsController}
+ */
+OptionsController.prototype.setSync = function (key, value) {
+  this._ensureEventsBinding();
+
+  var brick = this.brick;
+
+  // OBJECTE: set({ a:1, b:2 }) (pot incloure nested)
+  if (key && typeof key === 'object' && !Array.isArray(key)) {
+    var values = {};
+    var previous = {};
+
+    flattenEntries(key, '', values);
+
+    for (var vk in values) {
+      if (!Object.prototype.hasOwnProperty.call(values, vk)) continue;
+      previous[vk] = getWithFallback(this.data, vk);
+    }
+
+    var batchPayload = {
+      batch: true,
+      values: values,
+      previous: previous,
+      options: this,
+      brick: brick
+    };
+
+    // sense target: "options:value:"
+    brick.events.fire('options:value:', batchPayload);
+    return this;
+  }
+
+  // SINGLE: set('theme', 'dark')
+  var oldValue = getWithFallback(this.data, key);
+
+  var payload = {
+    key: key,
+    value: value,
+    previous: oldValue,
+    options: this,
+    brick: brick
+  };
+
+  // amb target: "options:value:<key>"
+  brick.events.fire('options:value:' + key, payload);
+  return this;
+};
+
+// Compat: alias set -> setAsync
+OptionsController.prototype.set = OptionsController.prototype.setAsync;
+
+/**
+ * Set sense emetre events.
+ * @param {string|Object} key
+ * @param {any} value
+ * @returns {OptionsController}
+ */
+OptionsController.prototype.setSilent = function (key, value) {
+  // Invalidate cache
+  this._cache = {};
+
+  // OBJECTE: setSilent({ a:1, b:2 })
+  if (key && typeof key === 'object' && !Array.isArray(key)) {
+    flattenEntries(key, '', this.data);
+    return this;
+  }
+
+  // SINGLE: setSilent('foo', 123)
+  setPath(this.data, toPath(key), value);
+  return this;
+};
+
+/**
+ * Get a value by key or return fallback.
+ * @param {string} key
+ * @param {any} fallback
+ * @returns {any}
+ */
+OptionsController.prototype.get = function (key, fallback) {
+  // 1. Return from cache if available
+  if (Object.prototype.hasOwnProperty.call(this._cache, key)) {
+    return this._cache[key];
+  }
+
+  // 2. Slow lookup
+  var val = getWithFallback(this.data, key);
+  var result = typeof val === 'undefined' ? fallback : val;
+
+  // 3. Store in cache
+  this._cache[key] = result;
+
+  return result;
+};
+
+/**
+ * Indica si la clau existeix.
+ * @param {string} key
+ * @returns {boolean}
+ */
+OptionsController.prototype.has = function (key) {
+  var path = toPath(key);
+  if (!path.length) return false;
+  var nested = hasPath(this.data, path);
+  if (nested) return true;
+  // compatibilitat: clau plana
+  return Object.prototype.hasOwnProperty.call(this.data, key);
+};
+
+/**
+ * Retorna una còpia superficial de totes les opcions.
+ * @returns {Object}
+ */
+OptionsController.prototype.all = function () {
+  return Object.assign({}, this.data);
+};
+
+// Helpers per gestionar claus amb punts com a rutes nested
+function toPath(key) {
+  if (!key && key !== 0) return [];
+  if (Array.isArray(key)) return key;
+  return String(key)
+    .split('.')
+    .filter(function (p) { return p !== ''; });
+}
+
+function setPath(obj, path, value) {
+  if (!path.length) return;
+  var cur = obj;
+  for (var i = 0; i < path.length - 1; i += 1) {
+    var seg = path[i];
+    if (!cur[seg] || typeof cur[seg] !== 'object') {
+      cur[seg] = {};
+    }
+    cur = cur[seg];
+  }
+  cur[path[path.length - 1]] = value;
+}
+
+function getPath(obj, path) {
+  var cur = obj;
+  for (var i = 0; i < path.length; i += 1) {
+    var seg = path[i];
+    if (!cur || !Object.prototype.hasOwnProperty.call(cur, seg)) {
+      return undefined;
+    }
+    cur = cur[seg];
+  }
+  return cur;
+}
+
+function hasPath(obj, path) {
+  var cur = obj;
+  for (var i = 0; i < path.length; i += 1) {
+    var seg = path[i];
+    if (!cur || !Object.prototype.hasOwnProperty.call(cur, seg)) {
+      return false;
+    }
+    cur = cur[seg];
+  }
+  return true;
+}
+
+function getWithFallback(data, key) {
+  var path = toPath(key);
+  if (path.length) {
+    var nested = getPath(data, path);
+    if (typeof nested !== 'undefined') return nested;
+  }
+  // compatibilitat amb claus planes existents
+  if (Object.prototype.hasOwnProperty.call(data, key)) {
+    return data[key];
+  }
+  return undefined;
+}
+
+// Extreu claus de tipus objecte en forma de "a.b": valor
+function flattenEntries(src, prefix, target) {
+  for (var k in src) {
+    if (!Object.prototype.hasOwnProperty.call(src, k)) continue;
+    var path = prefix ? prefix + '.' + k : k;
+    var val = src[k];
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      flattenEntries(val, path, target);
+    } else {
+      target[path] = val;
+    }
+  }
+}
+
+VanillaBrick.controllers = VanillaBrick.controllers || {};
+VanillaBrick.controllers.options = OptionsController;
 
 /**
  * Runtime controller - wraps all developer code execution from extensions.

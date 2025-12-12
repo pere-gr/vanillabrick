@@ -1,21 +1,4 @@
-function matchesFor(def, brick) {
-  const rule = def.for || def._for;
-  if (!rule) return true;
-  if (rule === '*') return true;
-  if (typeof rule === 'string') return rule === brick.kind;
-  if (Array.isArray(rule)) return rule.indexOf(brick.kind) !== -1;
-  return false;
-}
 
-function requiresMet(def, brick) {
-  const reqs = def.requires || def._requires;
-  if (!reqs || !reqs.length) return true;
-  for (let i = 0; i < reqs.length; i += 1) {
-    const ns = reqs[i];
-    if (!brick[ns]) return false;
-  }
-  return true;
-}
 
 function parseForPattern(pattern) {
   if (!pattern) return { ns: '', action: '', target: '*' };
@@ -37,43 +20,16 @@ ExtensionsController.prototype.applyAll = function () {
   const registry = VanillaBrick.controllers.extensionsRegistry;
   if (!registry || typeof registry.all !== 'function') return;
 
-  const defs = registry.all() || [];
-  if (!defs.length) return;
+  // Now registry returns a filtered, sorted, valid list
+  const defs = registry.all(this.brick) || [];
 
-  const pending = defs.slice();
-  let loops = 0;
-  const maxLoops = 20;
-
-  while (pending.length && loops < maxLoops) {
-    loops += 1;
-    let progressed = false;
-
-    for (let i = pending.length - 1; i >= 0; i -= 1) {
-      const def = pending[i];
-      if (!def) {
-        pending.splice(i, 1);
-        progressed = true;
-        continue;
-      }
-
-      if (!matchesFor(def.ext, this.brick)) {
-        pending.splice(i, 1);
-        progressed = true;
-        continue;
-      }
-
-      if (!requiresMet(def.ext, this.brick)) continue;
-
-      this._install(def);
-      pending.splice(i, 1);
-      progressed = true;
-    }
-
-    if (!progressed) break;
+  if (defs.length == 0) {
+    console.warn("No extensions found for this brick", this.brick);
+    return;
   }
 
-  if (pending.length) {
-    console.warn('VanillaBrick extensions not installed due to unmet requirements', pending);
+  for (let i = 0; i < defs.length; i += 1) {
+    this._install(defs[i]);
   }
 
   this._ensureDestroyHook();

@@ -34,11 +34,11 @@ function Brick(options) {
   });
 
   controllers.extensions.applyAll();
-  controllers.events.fireAsync('brick:ready:*', { options: opts });
+  controllers.events.fireAsync('brick:ready:now', { options: opts });
 }
 
 Brick.prototype.destroy = function () {
-  this._controllers.events.fire('brick:destroy:*', {});
+  this._controllers.events.fire('brick:destroy:now', {});
 };
 
 Object.defineProperty(Brick, '_idCounter', {

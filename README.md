@@ -20,7 +20,8 @@ often at the wrong time, and then you’re fighting the framework.
 VanillaBrick is an experiment to flip that around:
 
 - Every interesting thing is an **event** with 3 phases: `before` → `on` → `after`.
-- Events are named like `namespace:action:target` and can use wildcards.
+- Events are named strictly `namespace:type:target` (3 segments).
+- Listeners can use wildcards (`*`) to match any segment.
 - Extensions subscribe to those events and can **cancel**, **modify**, or **react** to them.
 - Components stay small and composable; “behaviour” lives in extensions and services.
 
@@ -46,7 +47,7 @@ All of this runs on plain JS – no bundler required to *use* it.
   services, data pipelines, orchestration logic, etc.
 
 - **Event bus with phases**  
-  - Event names like `brick:ready:grid1`, `store:data:set`, `store:data:sort`, …  
+  - Event names like `brick:ready:now`, `store:data:set`, `store:data:sort`.  
   - 3 phases: `before`, `on`, `after`.  
   - Synchronous `fire()` and async `fireAsync()`.
 
@@ -121,7 +122,7 @@ When the DOM is ready, VanillaBrick automatically:
 1. Finds `\.vb` elements.
 2. Creates a `VanillaBrick.brick` for each one.
 3. Applies all matching extensions (dom, store, grid, columns, rows, …).
-4. Fires `brick:ready:*`.
+4. Fires `brick:ready:now`.
 
 You can then grab the instance from JS:
 
@@ -184,18 +185,20 @@ Extensions can provide default options (they’re applied silently during instal
 
 ### Event bus
 
-Event names are strings in the form:
-
+Event names are strings in the strict form:
 ```text
-namespace:action:target
+namespace:type:target
 ```
-
+- **Namespace**: Context (e.g., `brick`, `store`).
+- **Type**: Verification (e.g., `ready`, `set`, `click`).
+- **Target**: Subject/ID (e.g., `now`, `grid1`, `header-row`).
+**Important**: You must provide exactly 3 segments. No more, no less.
+Wildcards (`*`) are allowed in listeners, but **forbidden** when firing events.
 Examples:
-
-- `brick:ready:grid1`
+- `brick:ready:now`
 - `store:data:set`
 - `store:data:sort`
-- `dom:click:*`
+- `dom:click:my-btn`
 
 You can subscribe with phases:
 
@@ -281,6 +284,37 @@ At install time the extensions controller:
 
 ---
 
+
+## Contracts & Conventions
+
+To keep sanity in a loosely coupled system, VanillaBrick enforces these strict rules:
+
+### 1. Event Naming Contract
+Events **MUST** follow the 3-segment format: `namespace:type:target`.
+
+| Segment     | Description | Rules |
+|------------|-------------|-------|
+| **Namespace** | The domain/owner of the event. | Required. Lowercase. No `*`. |
+| **Type**      | The verb or action type. | Required. Lowercase. No `*`. |
+| **Target**    | The specific instance or subject. | Required. No `*` (in dispatch). Wildcards allowed in listeners only. |
+
+**Invalid:** `my:event` (too short), `grid:cell:click:row:1` (too long).
+**Valid:** `grid:click:cell-1`.
+
+### 2. Reserved Events
+| Event | When |
+|-------|------|
+| `brick:ready:now` | Fired when the brick is fully initialized and extensions are applied. |
+| `brick:destroy:now` | Fired just before the brick is dismantled. |
+
+### 3. Lifecycle Phases
+Every event flows through 3 phases. Extensions should choose the right one:
+1. **`before`**: Validation, cancellation (`ev.cancel = true`), or data preparation.
+2. **`on`**: The core action. Skipped if canceled.
+3. **`after`**: Cleanup, logging, or UI updates reacting to the change.
+
+---
+
 ## Current extensions (alpha)
 
 This list will change, but right now you’ll find things like:
@@ -322,6 +356,8 @@ is designed with this kind of service in mind.
 ---
 
 ## Roadmap
+
+> 🧠 **Technical Deep Dive:** For a detailed breakdown of architectural decisions, performance optimizations (like Zero-Bind or Batching), and future core features, see [ROADMAP.md](./ROADMAP.md).
 
 Short-term ideas:
 
