@@ -1,81 +1,126 @@
-;(function (global) {
+; (function (global) {
   if (global.VanillaBrick) return;
   global.VanillaBrick = {
     base: {},
+    components: {},
     controllers: {},
     brick: null,
     extensions: {},
     runtime: {},
-    services: null,
+    services: {},
   };
 })(typeof window !== 'undefined' ? window : this);
 
 
-;(function (VanillaBrick) {
+; (function (VanillaBrick) {
+  
 
-
-  /**
-   * Brick constructor.
-   * @constructor
-   * @param {Object} options
-   */
-  function Brick(options) {
-    const opts = options && typeof options === 'object' ? Object.assign({}, options) : {};
-    opts.id = opts.id || this._nextId();
-    opts.kind = (opts.kind || 'brick').toLowerCase();
-    Object.defineProperty(this, 'id', {
-      value: opts.id,
-      writable: false,
-      configurable: false,
-      enumerable: true
-    });
-    Object.defineProperty(this, 'kind', {
-      value: opts.kind,
-      writable: false,
-      configurable: false,
-      enumerable: true
-    });
-    const controllers = Object.freeze({
-      options: new VanillaBrick.controllers.options(this,opts),
-      events: new VanillaBrick.controllers.events(this),
-      extensions: new VanillaBrick.controllers.extensions(this),
-    });
-    Object.defineProperty(this, '_controllers', {
-      value: controllers,
-      writable: false,
-      configurable: false,
-      enumerable: false
-    });
-
-    controllers.extensions.applyAll();
-    controllers.events.fireAsync('brick:ready:*', { options: opts });
-  }
-
-  Brick.prototype.destroy = function () {
-    this._controllers.events.fire('brick:destroy:*', {});
-  };
-
-  Object.defineProperty(Brick, '_idCounter', {
-    value: 0,
-    writable: true,
+/**
+ * Brick constructor.
+ * @constructor
+ * @param {Object} options
+ */
+function Brick(options) {
+  const opts = options && typeof options === 'object' ? Object.assign({}, options) : {};
+  opts.id = opts.id || this._nextId();
+  opts.kind = (opts.kind || 'brick').toLowerCase();
+  Object.defineProperty(this, 'id', {
+    value: opts.id,
+    writable: false,
     configurable: false,
-    enumerable: false
+    enumerable: true
   });
-
-  Object.defineProperty(Brick.prototype, '_nextId', {
-    value: function () {
-      Brick._idCounter += 1;
-      return 'brick-' + Brick._idCounter;
-    },
+  Object.defineProperty(this, 'kind', {
+    value: opts.kind,
+    writable: false,
+    configurable: false,
+    enumerable: true
+  });
+  const controllers = Object.freeze({
+    runtime: new VanillaBrick.controllers.runtime(this),
+    options: new VanillaBrick.controllers.options(this, opts),
+    events: new VanillaBrick.controllers.events(this),
+    extensions: new VanillaBrick.controllers.extensions(this),
+  });
+  Object.defineProperty(this, '_controllers', {
+    value: controllers,
     writable: false,
     configurable: false,
     enumerable: false
   });
 
-  VanillaBrick.brick = Brick;
+  controllers.extensions.applyAll();
+  controllers.events.fireAsync('brick:ready:*', { options: opts });
+}
+
+Brick.prototype.destroy = function () {
+  this._controllers.events.fire('brick:destroy:*', {});
+};
+
+Object.defineProperty(Brick, '_idCounter', {
+  value: 0,
+  writable: true,
+  configurable: false,
+  enumerable: false
+});
+
+Object.defineProperty(Brick.prototype, '_nextId', {
+  value: function () {
+    Brick._idCounter += 1;
+    return 'brick-' + Brick._idCounter;
+  },
+  writable: false,
+  configurable: false,
+  enumerable: false
+});
+
+VanillaBrick.brick = Brick;
 
 
-VanillaBrick.extensions.grid = {
+VanillaBrick.components.form = {
+    for: ['form'],
+    requires: ['dom'],
+    ns: 'form',
+    options: {},
+
+    brick: {
+        // Basic form component methods can be added here
+        submit: function () {
+            // Placeholder for submit logic
+            const el = this.dom.element();
+            if (el && typeof el.submit === 'function') el.submit();
+        },
+        reset: function () {
+            const el = this.dom.element();
+            if (el && typeof el.reset === 'function') el.reset();
+        }
+    },
+
+    extension: {
+        // Internal extension logic
+    },
+
+    events: [
+        // Basic lifecycle events
+        {
+            for: 'brick:ready:*',
+            on: {
+                fn: function () {
+                    // Initialization logic
+                }
+            }
+        }
+    ],
+
+    init: function () {
+        return true;
+    },
+
+    destroy: function () {
+    }
+};
+
+VanillaBrick.components.grid = {
   for: ['grid'],
   requires: ['dom'],
   ns: 'grid',
@@ -425,220 +470,277 @@ function EventBusController(brick) {
   VanillaBrick.controllers.events = EventBusController;
 
 
-  function matchesFor(def, brick) {
-    const rule = def.for || def._for;
-    if (!rule) return true;
-    if (rule === '*') return true;
-    if (typeof rule === 'string') return rule === brick.kind;
-    if (Array.isArray(rule)) return rule.indexOf(brick.kind) !== -1;
-    return false;
+function matchesFor(def, brick) {
+  const rule = def.for || def._for;
+  if (!rule) return true;
+  if (rule === '*') return true;
+  if (typeof rule === 'string') return rule === brick.kind;
+  if (Array.isArray(rule)) return rule.indexOf(brick.kind) !== -1;
+  return false;
+}
+
+function requiresMet(def, brick) {
+  const reqs = def.requires || def._requires;
+  if (!reqs || !reqs.length) return true;
+  for (let i = 0; i < reqs.length; i += 1) {
+    const ns = reqs[i];
+    if (!brick[ns]) return false;
   }
+  return true;
+}
 
-  function requiresMet(def, brick) {
-    const reqs = def.requires || def._requires;
-    if (!reqs || !reqs.length) return true;
-    for (let i = 0; i < reqs.length; i += 1) {
-      const ns = reqs[i];
-      if (!brick[ns]) return false;
-    }
-    return true;
-  }
+function parseForPattern(pattern) {
+  if (!pattern) return { ns: '', action: '', target: '*' };
+  const bits = String(pattern).split(':');
+  const ns = bits[0] || '';
+  const action = bits[1] || '';
+  let target = bits.length > 2 ? bits.slice(2).join(':') : '*';
+  if (!target) target = '*';
+  return { ns: ns, action: action, target: target };
+}
 
-  function parseForPattern(pattern) {
-    if (!pattern) return { ns: '', action: '', target: '*' };
-    const bits = String(pattern).split(':');
-    const ns = bits[0] || '';
-    const action = bits[1] || '';
-    let target = bits.length > 2 ? bits.slice(2).join(':') : '*';
-    if (!target) target = '*';
-    return { ns: ns, action: action, target: target };
-  }
+function ExtensionsController(brick) {
+  this.brick = brick;
+  this.extensions = {};
+  this._destroyHook = false;
+}
 
-  function ExtensionsController(brick) {
-    this.brick = brick;
-    this.extensions = {};
-    this._destroyHook = false;
-  }
+ExtensionsController.prototype.applyAll = function () {
+  const registry = VanillaBrick.controllers.extensionsRegistry;
+  if (!registry || typeof registry.all !== 'function') return;
 
-  ExtensionsController.prototype.applyAll = function () {
-    const registry = VanillaBrick.controllers.extensionsRegistry;
-    if (!registry || typeof registry.all !== 'function') return;
+  const defs = registry.all() || [];
+  if (!defs.length) return;
 
-    const defs = registry.all() || [];
-    if (!defs.length) return;
+  const pending = defs.slice();
+  let loops = 0;
+  const maxLoops = 20;
 
-    const pending = defs.slice();
-    let loops = 0;
-    const maxLoops = 20;
+  while (pending.length && loops < maxLoops) {
+    loops += 1;
+    let progressed = false;
 
-    while (pending.length && loops < maxLoops) {
-      loops += 1;
-      let progressed = false;
-
-      for (let i = pending.length - 1; i >= 0; i -= 1) {
-        const def = pending[i];
-        if (!def) {
-          pending.splice(i, 1);
-          progressed = true;
-          continue;
-        }
-
-        if (!matchesFor(def.ext, this.brick)) {
-          pending.splice(i, 1);
-          progressed = true;
-          continue;
-        }
-
-        if (!requiresMet(def.ext, this.brick)) continue;
-        
-        this._install(def);
+    for (let i = pending.length - 1; i >= 0; i -= 1) {
+      const def = pending[i];
+      if (!def) {
         pending.splice(i, 1);
         progressed = true;
+        continue;
       }
 
-      if (!progressed) break;
+      if (!matchesFor(def.ext, this.brick)) {
+        pending.splice(i, 1);
+        progressed = true;
+        continue;
+      }
+
+      if (!requiresMet(def.ext, this.brick)) continue;
+
+      this._install(def);
+      pending.splice(i, 1);
+      progressed = true;
     }
 
-    if (pending.length) {
-      console.warn('VanillaBrick extensions not installed due to unmet requirements', pending);
-    }
+    if (!progressed) break;
+  }
 
-    this._ensureDestroyHook();
+  if (pending.length) {
+    console.warn('VanillaBrick extensions not installed due to unmet requirements', pending);
+  }
+
+  this._ensureDestroyHook();
+};
+
+ExtensionsController.prototype._install = function (def) {
+  const brick = this.brick;
+  const name = def.name || def.ext.ns || null;
+  const ns = def.ext.ns || name;
+
+  if (!name) {
+    console.warn('VanillaBrick extension without name/ns, skipped', def);
+    return;
+  }
+
+  if (this.extensions[name]) return;
+
+  const ext = {
+    name: name,
+    //def:def.ext,
+    brick: brick,
   };
 
-  ExtensionsController.prototype._install = function (def) {
-    const brick = this.brick;
-    const name = def.name || def.ext.ns || null;
-    const ns = def.ext.ns || name;
-
-    if (!name) {
-      console.warn('VanillaBrick extension without name/ns, skipped', def);
-      return;
-    }
-
-    if (this.extensions[name]) return;
-
-    const ext = {
-      name: name,
-      //def:def.ext,
-      brick: brick,
-    };
-
-    // attach internal extension methods to ext (bound)
-    if (def.ext.extension && typeof def.ext.extension === 'object') {
-      for (const k in def.ext.extension) {
-        if (!Object.prototype.hasOwnProperty.call(def.ext.extension, k)) continue;
-        const fn = def.ext.extension[k];
-        if (typeof fn === 'function') {
-          ext[k] = fn.bind(ext);
+  // attach internal extension methods to ext (bound + wrapped)
+  if (def.ext.extension && typeof def.ext.extension === 'object') {
+    for (const k in def.ext.extension) {
+      if (!Object.prototype.hasOwnProperty.call(def.ext.extension, k)) continue;
+      const fn = def.ext.extension[k];
+      if (typeof fn === 'function') {
+        const boundFn = fn.bind(ext);
+        const runtime = brick._controllers.runtime;
+        if (runtime && typeof runtime.wrap === 'function') {
+          ext[k] = runtime.wrap(boundFn, ext, {
+            type: 'extension-private',
+            ext: name,
+            brick: brick.id,
+            fnName: k
+          });
+        } else {
+          ext[k] = boundFn;
         }
       }
     }
+  }
 
-    // defaults options
-    const defOpts = def.ext.options || def.ext._options;
-    if (defOpts &&
-        brick._controllers &&
-        brick._controllers.options &&
-        typeof brick._controllers.options.setSilent === 'function') {
-      brick._controllers.options.setSilent(defOpts);
-    }
+  // defaults options
+  const defOpts = def.ext.options || def.ext._options;
+  if (defOpts &&
+    brick._controllers &&
+    brick._controllers.options &&
+    typeof brick._controllers.options.setSilent === 'function') {
+    brick._controllers.options.setSilent(defOpts);
+  }
 
-    // expose API on brick namespace
-    if (def.ext.brick && typeof def.ext.brick === 'object') {
-      if (!brick[ns]) brick[ns] = {};
-      const nsObj = brick[ns];
-      for (const apiName in def.ext.brick) {
-        if (!Object.prototype.hasOwnProperty.call(def.ext.brick, apiName)) continue;
-        const apiFn = def.ext.brick[apiName];
-        if (typeof apiFn !== 'function') {
-          console.warn('VanillaBrick extension "' + name + '" api "' + apiName + '" is not a function');
-          continue;
-        }
-        if (nsObj[apiName]) {
-          console.warn('VanillaBrick extension overwriting API ' + ns + '.' + apiName);
-        }
-        nsObj[apiName] = apiFn.bind(brick);
+  // expose API on brick namespace (wrapped)
+  if (def.ext.brick && typeof def.ext.brick === 'object') {
+    if (!brick[ns]) brick[ns] = {};
+    const nsObj = brick[ns];
+    for (const apiName in def.ext.brick) {
+      if (!Object.prototype.hasOwnProperty.call(def.ext.brick, apiName)) continue;
+      const apiFn = def.ext.brick[apiName];
+      if (typeof apiFn !== 'function') {
+        console.warn('VanillaBrick extension "' + name + '" api "' + apiName + '" is not a function');
+        continue;
       }
-    }
-
-            // init hook (this === ext)
-    if (typeof def.ext.init === 'function') {
-      try {
-        const res = def.ext.init.call(ext);
-        if (res === false) return;
-      } catch (err) {
-        console.error('VanillaBrick extension "' + name + '" init() failed', err);
-        return;
+      if (nsObj[apiName]) {
+        console.warn('VanillaBrick extension overwriting API ' + ns + '.' + apiName);
       }
-    }
-
-    // register event listeners
-    if (Array.isArray(def.ext.events) &&
-        def.ext.events.length &&
-        brick._controllers &&
-        brick._controllers.events &&
-        typeof brick._controllers.events.on === 'function') {
-
-      for (let li = 0; li < def.ext.events.length; li += 1) {
-        const evt = def.ext.events[li];
-        if (!evt) continue;
-        const parsed = parseForPattern(evt.for);
-
-        ['before', 'on', 'after'].forEach(function (phase) {
-          const desc = evt[phase];
-          if (!desc || typeof desc.fn !== 'function') return;
-          const pr = (typeof desc.priority === 'number') ? desc.priority : undefined;
-          const pattern = parsed.ns + ':' + parsed.action + ':' + parsed.target;
-          const wrapped = desc.fn.bind(ext);
-          brick._controllers.events.on(pattern, phase, pr, wrapped, { ext: name, fn: desc.fn.name || 'anon' });
+      const boundFn = apiFn.bind(brick);
+      const runtime = brick._controllers.runtime;
+      if (runtime && typeof runtime.wrap === 'function') {
+        nsObj[apiName] = runtime.wrap(boundFn, brick, {
+          type: 'brick-api',
+          ext: name,
+          brick: brick.id,
+          fnName: ns + '.' + apiName
         });
+      } else {
+        nsObj[apiName] = boundFn;
       }
     }
+  }
 
-    this.extensions[name] = ext;
-  };
-
-  ExtensionsController.prototype._ensureDestroyHook = function () {
-    if (this._destroyHook) return;
-
-    const brick = this.brick;
-    if (!brick ||
-        !brick._controllers ||
-        !brick._controllers.events ||
-        typeof brick._controllers.events.on !== 'function') {
+  // init hook (this === ext, wrapped)
+  if (typeof def.ext.init === 'function') {
+    const runtime = brick._controllers.runtime;
+    try {
+      let res;
+      if (runtime && typeof runtime.execute === 'function') {
+        res = runtime.execute(def.ext.init, ext, [], {
+          type: 'init',
+          ext: name,
+          brick: brick.id,
+          fnName: 'init'
+        });
+      } else {
+        res = def.ext.init.call(ext);
+      }
+      if (res === false) return;
+    } catch (err) {
+      console.error('VanillaBrick extension "' + name + '" init() failed', err);
       return;
     }
+  }
 
-    this._destroyHook = true;
-    const self = this;
+  // register event listeners
+  if (Array.isArray(def.ext.events) &&
+    def.ext.events.length &&
+    brick._controllers &&
+    brick._controllers.events &&
+    typeof brick._controllers.events.on === 'function') {
 
-    brick._controllers.events.on(
-      'brick:destroy:*',
-      'on',
-      0,
-      function () {
-        for (const name in self.extensions) {
-          if (!Object.prototype.hasOwnProperty.call(self.extensions, name)) continue;
-          const ext = self.extensions[name];
-          if (!ext || !ext.def) continue;
-          const def = ext.def;
+    for (let li = 0; li < def.ext.events.length; li += 1) {
+      const evt = def.ext.events[li];
+      if (!evt) continue;
+      const parsed = parseForPattern(evt.for);
 
-          if (typeof def.destroy === 'function') {
-            try {
+      ['before', 'on', 'after'].forEach(function (phase) {
+        const desc = evt[phase];
+        if (!desc || typeof desc.fn !== 'function') return;
+        const pr = (typeof desc.priority === 'number') ? desc.priority : undefined;
+        const pattern = parsed.ns + ':' + parsed.action + ':' + parsed.target;
+        const boundFn = desc.fn.bind(ext);
+        const runtime = brick._controllers.runtime;
+        let wrapped;
+        if (runtime && typeof runtime.wrap === 'function') {
+          wrapped = runtime.wrap(boundFn, ext, {
+            type: 'event',
+            ext: name,
+            brick: brick.id,
+            event: pattern,
+            phase: phase,
+            fnName: desc.fn.name || 'anon'
+          });
+        } else {
+          wrapped = boundFn;
+        }
+        brick._controllers.events.on(pattern, phase, pr, wrapped, { ext: name, fn: desc.fn.name || 'anon' });
+      });
+    }
+  }
+
+  this.extensions[name] = ext;
+};
+
+ExtensionsController.prototype._ensureDestroyHook = function () {
+  if (this._destroyHook) return;
+
+  const brick = this.brick;
+  if (!brick ||
+    !brick._controllers ||
+    !brick._controllers.events ||
+    typeof brick._controllers.events.on !== 'function') {
+    return;
+  }
+
+  this._destroyHook = true;
+  const self = this;
+
+  brick._controllers.events.on(
+    'brick:destroy:*',
+    'on',
+    0,
+    function () {
+      for (const name in self.extensions) {
+        if (!Object.prototype.hasOwnProperty.call(self.extensions, name)) continue;
+        const ext = self.extensions[name];
+        if (!ext || !ext.def) continue;
+        const def = ext.def;
+
+        if (typeof def.destroy === 'function') {
+          const runtime = brick._controllers.runtime;
+          try {
+            if (runtime && typeof runtime.execute === 'function') {
+              runtime.execute(def.destroy, ext, [], {
+                type: 'destroy',
+                ext: name,
+                brick: brick.id,
+                fnName: 'destroy'
+              });
+            } else {
               def.destroy.call(ext);
-            } catch (err) {
-              console.error('VanillaBrick extension "' + (def.ns || name || '?') + '" destroy() failed', err);
             }
+          } catch (err) {
+            console.error('VanillaBrick extension "' + (def.ns || name || '?') + '" destroy() failed', err);
           }
         }
-
-        self.extensions = {};
       }
-    );
-  };
 
-  VanillaBrick.controllers.extensions = ExtensionsController;
+      self.extensions = {};
+    }
+  );
+};
+
+VanillaBrick.controllers.extensions = ExtensionsController;
 
 
   // Diccionari de definicions d'extensions:
@@ -1013,6 +1115,118 @@ function EventBusController(brick) {
   VanillaBrick.controllers.options = OptionsController;
 
 
+/**
+ * Runtime controller - wraps all developer code execution from extensions.
+ * Provides centralized error handling and metadata capture for debugging.
+ * @constructor
+ * @param {Object} brick - The brick instance this controller belongs to
+ */
+function RuntimeController(brick) {
+    this.brick = brick || null;
+}
+
+/**
+ * Execute developer code with error handling and metadata capture.
+ * 
+ * @param {Function} fn - The function to execute
+ * @param {Object} context - The 'this' context for the function
+ * @param {Array} args - Arguments to pass to the function
+ * @param {Object} meta - Metadata for debugging
+ *   - type: 'event' | 'init' | 'destroy' | 'brick-api' | 'extension-private'
+ *   - ext: extension name
+ *   - brick: brick.id (optional)
+ *   - event: event name (optional, for event handlers)
+ *   - phase: event phase (optional, for event handlers)
+ *   - fnName: function name (optional)
+ * @returns {*} The result of the function execution
+ */
+RuntimeController.prototype.execute = function (fn, context, args, meta) {
+    if (typeof fn !== 'function') {
+        console.warn('[RuntimeController] Attempted to execute non-function', meta);
+        return undefined;
+    }
+
+    try {
+        const result = fn.apply(context, args);
+
+        // Support async functions
+        if (result && typeof result.then === 'function') {
+            return result.catch(function (err) {
+                this._handleError(err, fn, context, meta);
+                return Promise.reject(err);
+            }.bind(this));
+        }
+
+        return result;
+    } catch (err) {
+        this._handleError(err, fn, context, meta);
+        throw err;
+    }
+};
+
+/**
+ * Handle errors from developer code execution.
+ * Logs detailed information including source code for debugging.
+ * 
+ * @param {Error} err - The error that occurred
+ * @param {Function} fn - The function that threw the error
+ * @param {Object} context - The context the function was executed in
+ * @param {Object} meta - Metadata about the execution
+ * @private
+ */
+RuntimeController.prototype._handleError = function (err, fn, context, meta) {
+    const errorInfo = {
+        error: err,
+        message: err.message || String(err),
+        stack: err.stack,
+        meta: meta || {},
+        context: {
+            brick: context && context.id ? context.id : null,
+            kind: context && context.kind ? context.kind : null
+        }
+    };
+
+    // Try to capture function source for debugging
+    try {
+        errorInfo.fnSource = fn.toString();
+    } catch (e) {
+        errorInfo.fnSource = '[unable to capture source]';
+    }
+
+    console.error('[RuntimeController] Error executing developer code:', errorInfo);
+
+    // Future: delegate to errorController
+    // if (this.errorController && typeof this.errorController.handle === 'function') {
+    //   this.errorController.handle(errorInfo);
+    // }
+};
+
+/**
+ * Wrap a function with runtime execution protection.
+ * Returns a new function that will execute through the runtime controller.
+ * 
+ * @param {Function} fn - The function to wrap
+ * @param {Object} context - The 'this' context for the function
+ * @param {Object} meta - Metadata for debugging
+ * @returns {Function} Wrapped function
+ */
+RuntimeController.prototype.wrap = function (fn, context, meta) {
+    if (typeof fn !== 'function') {
+        return fn;
+    }
+
+    const runtime = this;
+    return function wrappedFunction() {
+        const args = Array.prototype.slice.call(arguments);
+        return runtime.execute(fn, context, args, meta);
+    };
+};
+
+// Expose constructor for per-brick instantiation
+VanillaBrick.controllers = VanillaBrick.controllers || {};
+VanillaBrick.controllers.runtime = RuntimeController;
+
+
 VanillaBrick.extensions.domCss = {
   for: '*',
   requires: ['dom'],
@@ -1278,6 +1492,281 @@ VanillaBrick.extensions.dom = {
 };
 
 
+VanillaBrick.extensions.items = {
+    for: ['form'],
+    requires: ['dom'],
+    ns: 'items',
+    options: {},
+
+    brick: {
+        get: function () {
+            return this.options.get('form.items', []);
+        }
+    },
+
+    extension: {
+        _parseFromDom: function () {
+            const root = this.brick.dom.element();
+            if (!root) return [];
+
+            const items = [];
+            const groups = root.querySelectorAll('.vb-form-group');
+
+            for (let i = 0; i < groups.length; i++) {
+                const groupEl = groups[i];
+                const group = {
+                    type: 'group',
+                    items: []
+                };
+
+                // Check structure inside group
+                const fields = groupEl.querySelectorAll('.vb-form-field');
+                for (let j = 0; j < fields.length; j++) {
+                    const fieldEl = fields[j];
+                    const input = fieldEl.querySelector('input, select, textarea');
+                    const label = fieldEl.querySelector('label');
+
+                    if (input) {
+                        const fieldItem = {
+                            type: 'field',
+                            name: input.name || input.id,
+                            label: label ? label.textContent : '',
+                            controlType: input.tagName.toLowerCase(),
+                            inputType: input.type,
+                            required: input.required,
+                            placeholder: input.placeholder,
+                            // Detect span from parent column if exists
+                            span: this._detectSpan(fieldEl)
+                        };
+                        group.items.push(fieldItem);
+                    }
+                }
+                items.push(group);
+            }
+            return items;
+        },
+
+        _detectSpan: function (el) {
+            let current = el;
+            while (current && !current.classList.contains('vb-row')) {
+                if (current.className && typeof current.className === 'string') {
+                    const match = current.className.match(/vb-span-(\d+)/);
+                    if (match) return parseInt(match[1], 10);
+                }
+                current = current.parentElement;
+                if (!current || current.tagName === 'FORM') break;
+            }
+            return 12; // Default full width
+        },
+
+        _render: function (items) {
+            const root = this.brick.dom.element();
+            if (!root) return;
+
+            // Always clear existing content when rendering from items list
+            root.innerHTML = '';
+
+            items.forEach(item => {
+                if (item.type === 'group') {
+                    const groupEl = document.createElement('div');
+                    groupEl.className = 'vb-form-group';
+
+                    const rowEl = document.createElement('div');
+                    rowEl.className = 'vb-row';
+
+                    if (item.items && item.items.length) {
+                        item.items.forEach(field => {
+                            const span = field.span || 12;
+                            const colEl = document.createElement('div');
+                            colEl.className = 'vb-span-' + span;
+
+                            const fieldContainer = document.createElement('div');
+                            fieldContainer.className = 'vb-form-field';
+
+                            if (field.label) {
+                                const label = document.createElement('label');
+                                label.textContent = field.label;
+                                if (field.name) label.htmlFor = field.name;
+                                fieldContainer.appendChild(label);
+                            }
+
+                            let input;
+                            if (field.controlType === 'textarea') {
+                                input = document.createElement('textarea');
+                            } else if (field.controlType === 'select') {
+                                input = document.createElement('select');
+                                // TODO: options
+                            } else {
+                                input = document.createElement('input');
+                                input.type = field.inputType || 'text';
+                            }
+
+                            if (field.name) {
+                                input.name = field.name;
+                                input.id = field.name;
+                            }
+                            if (field.placeholder) input.placeholder = field.placeholder;
+                            // handle required gracefully
+                            if (field.required === true || field.required === 'true' || field.required === 'required') {
+                                input.required = true;
+                            }
+
+                            fieldContainer.appendChild(input);
+                            colEl.appendChild(fieldContainer);
+                            rowEl.appendChild(colEl);
+                        });
+                    }
+
+                    groupEl.appendChild(rowEl);
+                    root.appendChild(groupEl);
+                }
+            });
+
+            // Add Actions container if needed (can be separate config)
+        }
+    },
+
+    events: [
+        {
+            for: 'brick:ready:*',
+            before: {
+                fn: function (ev) {
+                    // Start fresh
+                    let items = [];
+                    // Check options first (programmatic)
+                    if (this.brick.options.has('form.items')) {
+                        items = this.brick.options.get('form.items');
+                    }
+
+                    if (!items || items.length === 0) {
+                        // Try to parse from global variable defined in attribute
+                        const root = this.brick.dom.element();
+                        if (root) {
+                            const configVar = root.getAttribute('brick-form-items') || root.getAttribute('data-form-items');
+                            if (configVar && window[configVar]) {
+                                console.log('[Form Items] Config var found', configVar);
+                                items = window[configVar];
+                                this.brick.options.set('form.items', items);
+                            }
+                        }
+
+                        // if still no items, check if current DOM has any specific structure to parse
+                        // (only if we didn't just load them from var)
+                        if (!items || items.length === 0) {
+                            // Try to parse from DOM
+                            console.log('[Form Items] Parsing from DOM', this.brick.id);
+                            items = this._parseFromDom();
+                            this.brick.options.set('form.items', items);
+                        }
+                    } else {
+                        console.log('[Form Items] Config found in options', items);
+                    }
+
+                    // Helper to access data in on phase
+                    ev.data = ev.data || {};
+                    ev.data.formItems = items;
+                }
+            },
+            on: {
+                fn: function (ev) {
+                    const items = ev.data.formItems || this.brick.options.get('form.items');
+
+                    if (items && items.length > 0) {
+                        // We render if there are items. 
+                        // Note: If we just parsed them from DOM, this will clear and re-render the same structure.
+                        // Ideally we check if we need to render.
+                        // But per requirements: "Si li pasem un arbre d'items... tant és el que hi hagi en el html/DOM. Ha d'haver-hi aquells. Si cal netejar el DOM i afegir els nous... es fa."
+
+                        // Optimization: if we just parsed it, re-rendering is redundant but safe. 
+                        // To avoid infinite loop or weirdness, we could check a flag, but strict rendering ensures state == DOM.
+                        this._render(items);
+                    }
+                }
+            }
+        }
+    ],
+
+    init: function () {
+        return true;
+    },
+
+    destroy: function () {
+    }
+};
+
+VanillaBrick.extensions.record = {
+    for: ['form'],
+    requires: ['dom', 'store'],
+    ns: 'record',
+    options: {},
+
+    brick: {
+        // We could expose methods to get/set the current record directly if needed
+        getRecord: function () {
+            const data = this.store.load();
+            return (data && data.length) ? data[0] : null;
+        }
+    },
+
+    extension: {
+        _bind: function (record) {
+            const root = this.brick.dom.element();
+            if (!root) return;
+
+            // Iterate over all form fields
+            const inputs = root.querySelectorAll('input, select, textarea');
+            for (let i = 0; i < inputs.length; i++) {
+                const input = inputs[i];
+                const name = input.name || input.id;
+                if (!name) continue;
+
+                // If record has this field, set value
+                if (record && Object.prototype.hasOwnProperty.call(record, name)) {
+                    input.value = record[name];
+                } else {
+                    // Optional: clear if not in record? Or leave defaults?
+                    // Typically binding means reflecting state. If state is null, clear.
+                    // But if record doesn't have the key, maybe leave it?
+                    // Let's assume strict binding for now: if record is null, clear.
+                    if (!record) input.value = '';
+                }
+            }
+        }
+    },
+
+    events: [
+        {
+            for: 'brick:ready:*',
+            on: {
+                fn: function (ev) {
+                    const data = this.brick.store.load();
+                    if (data && data.length) {
+                        this._bind(data[0]);
+                    }
+                }
+            }
+        },
+        {
+            for: 'store:data:*',
+            after: {
+                fn: function (ev) {
+                    const data = this.brick.store.load();
+                    // We bind the first record
+                    const record = (data && data.length) ? data[0] : null;
+                    this._bind(record);
+                }
+            }
+        }
+    ],
+
+    init: function () {
+        return true;
+    },
+
+    destroy: function () {
+    }
+};
+
 VanillaBrick.extensions.columns = {
   for: ['grid'],
   requires: ['dom', 'store'],
@@ -1373,6 +1862,120 @@ VanillaBrick.extensions.columns = {
 };
 
 
+
+VanillaBrick.extensions.rowsFocused = {
+    for: ['grid'],
+    requires: ['dom', 'rows', 'store'],
+    ns: 'rowsFocused',
+    options: {},
+
+    brick: {},
+
+    extension: {},
+
+    events: [
+        {
+            for: 'brick:ready:*',
+            on: {
+                fn: function () {
+                    const brick = this.brick;
+                    const root = brick.dom.element();
+
+                    // Define logic locally to avoid context issues
+                    function addTabIndex() {
+                        const el = brick.dom.element();
+                        if (!el) return;
+                        const rows = el.querySelectorAll('tbody tr') || [];
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            if (!row.hasAttribute('tabindex')) {
+                                row.setAttribute('tabindex', '0');
+                            }
+                        }
+                    }
+
+                    function handleFocus(target) {
+                        const row = target.closest('tr');
+                        if (!row) return;
+
+                        const el = brick.dom.element();
+                        const old = el.querySelector('tr.vb-focused');
+                        if (old) old.classList.remove('vb-focused');
+                        row.classList.add('vb-focused');
+
+                        const rowIndex = Array.prototype.indexOf.call(row.parentNode.children, row);
+                        const data = brick.store.get(rowIndex);
+
+                        brick.events.fire('dom:row:focus', {
+                            index: rowIndex,
+                            row: data,
+                            element: row
+                        });
+                    }
+
+                    // Attach listener
+                    if (root) {
+                        root.addEventListener('focusin', function (e) {
+                            handleFocus(e.target);
+                        });
+                    }
+
+                    // Run initial
+                    addTabIndex();
+
+                    // Store reference for other handlers? 
+                    // We can't easily share with other events without `this`.
+                    // But other events just need addTabIndex.
+                    // Let's rely on the method existing on `this` for safely?
+                    // No, let's redefine addTabIndex in the other handlers or attach it to the brick instance temporarily? 
+                    // Actually, defining it on `this` manually is safe if WE do it.
+                    this._safeAddTabIndex = addTabIndex;
+                }
+            }
+        },
+        {
+            for: 'store:data:set',
+            after: {
+                fn: function () {
+                    // Use the safe reference we attached, or assume `this._safeAddTabIndex` works?
+                    // If `this` is consistent across events, it works.
+                    // If not, we re-implement. It's short.
+                    const brick = this.brick;
+                    const el = brick.dom.element();
+                    if (!el) return;
+                    const rows = el.querySelectorAll('tbody tr') || [];
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row.hasAttribute('tabindex')) {
+                            row.setAttribute('tabindex', i);
+                        }
+                    }
+                }
+            }
+        },
+        {
+            for: 'store:data:sort',
+            after: {
+                fn: function () {
+                    const brick = this.brick;
+                    const el = brick.dom.element();
+                    if (!el) return;
+                    const rows = el.querySelectorAll('tbody tr') || [];
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row.hasAttribute('tabindex')) {
+                            row.setAttribute('tabindex', i);
+                        }
+                    }
+                }
+            }
+        }
+    ],
+
+    init: function () { },
+
+    destroy: function () { }
+};
 
 VanillaBrick.extensions.rows = {
   for: ['grid'],
@@ -1586,6 +2189,123 @@ VanillaBrick.extensions.store = {
 };
 
 
+VanillaBrick.extensions.wire = {
+    for: ['*'], // Available to all bricks (except maybe services themselves? But services might want to use wire too)
+    requires: [], // No strict requirements
+    ns: 'wire',
+    options: {},
+
+    brick: {
+        send: function (eventName, data) {
+            // Send message via wire
+            this.events.fire('wire:outbound', { event: eventName, data: data });
+        }
+    },
+
+    extension: {
+        service: null,
+
+        _connect: function () {
+            if (this.service) return;
+
+            // Connect to WireService
+            if (VanillaBrick.service) {
+                this.service = VanillaBrick.service('WireService');
+            }
+
+            if (this.service) {
+                const self = this;
+                // Listen to broadcasts
+                // We need to listen to the service's events.
+                // Assuming service is a brick structure with .events controller.
+                this.service.events.on('wire:broadcast', function (ev) {
+                    self._handleBroadcast(ev);
+                });
+
+                // Also listen for outbound from this brick to forward to service
+                // (Handled in events below or directly via brick method calling internal helper?)
+                // The brick method fires 'wire:outbound', so we listen to it here.
+            }
+        },
+
+        _handleBroadcast: function (ev) {
+            const payload = ev.data || {};
+            const senderId = payload.from;
+            const eventName = payload.event;
+            const data = payload.data;
+
+            // Don't echo back to self?
+            if (senderId === this.brick.id) return;
+
+            // Fire local event
+            // We wrap it? or just fire raw?
+            // User said "proxy per a que... s'enviïn events".
+            // If brick A sends "user:login", brick B should receive "user:login".
+            if (eventName) {
+                this.brick.events.fire(eventName, data);
+            }
+        },
+
+        _send: function (eventName, data) {
+            if (!this.service) this._connect();
+            if (!this.service) return; // Still no service?
+
+            this.service.events.fire('wire:message', {
+                from: this.brick.id,
+                event: eventName,
+                data: data
+            });
+        }
+    },
+
+    events: [
+        {
+            for: 'brick:ready:*',
+            on: {
+                fn: function () {
+                    this._connect();
+                }
+            }
+        },
+        {
+            for: 'wire:outbound',
+            on: {
+                fn: function (ev) {
+                    const p = ev.data || {};
+                    this._send(p.event, p.data);
+                }
+            }
+        },
+        {
+            for: '*:*:*',
+            on: {
+                fn: function (ev) {
+                    console.log("wire", ev);
+                }
+            }
+        }
+    ],
+
+    init: function () { },
+
+    destroy: function () { }
+};
+
+VanillaBrick.services.WireService = {
+    kind: 'wire-service',
+    events: [
+        {
+            for: 'wire:message',
+            on: {
+                fn: function (ev) {
+                    const payload = ev.data || {};
+                    this.brick.events.fire('wire:broadcast', payload);
+                }
+            }
+        }
+    ]
+};
+
 
   VanillaBrick.base = VanillaBrick.base || {};
 
@@ -1679,6 +2399,57 @@ VanillaBrick.extensions.store = {
   }
 
 
+
+// Ensure runtime services registry
+VanillaBrick.runtime.services = VanillaBrick.runtime.services || {};
+
+// Public accessor
+VanillaBrick.service = function (name) {
+    // Check if running
+    if (VanillaBrick.runtime.services[name]) {
+        return VanillaBrick.runtime.services[name];
+    }
+    // Try to start
+    return VanillaBrick.base.serviceStart(name);
+};
+
+// Internal helpers in base
+VanillaBrick.base.serviceStart = function (name) {
+    if (VanillaBrick.runtime.services[name]) {
+        return VanillaBrick.runtime.services[name];
+    }
+
+    const def = VanillaBrick.services[name];
+    if (!def) {
+        console.warn("Service definition not found:", name);
+        return null;
+    }
+
+    const opts = Object.assign({}, def);
+    opts.id = name; // Service name as ID
+    opts.kind = opts.kind || 'service';
+
+    // Create brick instance
+    const brick = new VanillaBrick.brick(opts);
+
+    // Register instance
+    VanillaBrick.runtime.services[name] = brick;
+
+    if (VanillaBrick.runtime.bricks && Array.isArray(VanillaBrick.runtime.bricks)) {
+        VanillaBrick.runtime.bricks.push(brick);
+    }
+
+    return brick;
+};
+
+VanillaBrick.base.serviceStop = function (name) {
+    const service = VanillaBrick.runtime.services[name];
+    if (!service) return;
+
+    if (service.destroy) service.destroy();
+
+    delete VanillaBrick.runtime.services[name];
+};
 
 })(window.VanillaBrick);
 

@@ -1,0 +1,158 @@
+/* VanillaBrick Layout System - Grid Layout */
+
+/* Container */
+.vb-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.vb-container-fluid {
+  width: 100%;
+  padding: 0 1rem;
+}
+
+/* Row - Flexbox based grid */
+.vb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* Columns - 12 column grid system */
+.vb-col {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Span classes - vb-span-1 to vb-span-12 */
+.vb-span-1 {
+  flex: 0 0 calc(8.333333% - 1rem);
+  max-width: calc(8.333333% - 1rem);
+}
+
+.vb-span-2 {
+  flex: 0 0 calc(16.666667% - 1rem);
+  max-width: calc(16.666667% - 1rem);
+}
+
+.vb-span-3 {
+  flex: 0 0 calc(25% - 1rem);
+  max-width: calc(25% - 1rem);
+}
+
+.vb-span-4 {
+  flex: 0 0 calc(33.333333% - 1rem);
+  max-width: calc(33.333333% - 1rem);
+}
+
+.vb-span-5 {
+  flex: 0 0 calc(41.666667% - 1rem);
+  max-width: calc(41.666667% - 1rem);
+}
+
+.vb-span-6 {
+  flex: 0 0 calc(50% - 1rem);
+  max-width: calc(50% - 1rem);
+}
+
+.vb-span-7 {
+  flex: 0 0 calc(58.333333% - 1rem);
+  max-width: calc(58.333333% - 1rem);
+}
+
+.vb-span-8 {
+  flex: 0 0 calc(66.666667% - 1rem);
+  max-width: calc(66.666667% - 1rem);
+}
+
+.vb-span-9 {
+  flex: 0 0 calc(75% - 1rem);
+  max-width: calc(75% - 1rem);
+}
+
+.vb-span-10 {
+  flex: 0 0 calc(83.333333% - 1rem);
+  max-width: calc(83.333333% - 1rem);
+}
+
+.vb-span-11 {
+  flex: 0 0 calc(91.666667% - 1rem);
+  max-width: calc(91.666667% - 1rem);
+}
+
+.vb-span-12 {
+  flex: 0 0 calc(100% - 1rem);
+  max-width: calc(100% - 1rem);
+}
+
+/* Gap utilities */
+.vb-row-gap-0 {
+  gap: 0;
+}
+
+.vb-row-gap-sm {
+  gap: 0.5rem;
+}
+
+.vb-row-gap-md {
+  gap: 1rem;
+}
+
+.vb-row-gap-lg {
+  gap: 2rem;
+}
+
+/* Alignment utilities */
+.vb-row-align-start {
+  align-items: flex-start;
+}
+
+.vb-row-align-center {
+  align-items: center;
+}
+
+.vb-row-align-end {
+  align-items: flex-end;
+}
+
+.vb-row-align-stretch {
+  align-items: stretch;
+}
+
+.vb-row-justify-start {
+  justify-content: flex-start;
+}
+
+.vb-row-justify-center {
+  justify-content: center;
+}
+
+.vb-row-justify-end {
+  justify-content: flex-end;
+}
+
+.vb-row-justify-between {
+  justify-content: space-between;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 600px) {
+
+  .vb-span-1,
+  .vb-span-2,
+  .vb-span-3,
+  .vb-span-4,
+  .vb-span-5,
+  .vb-span-6,
+  .vb-span-7,
+  .vb-span-8,
+  .vb-span-9,
+  .vb-span-10,
+  .vb-span-11,
+  .vb-span-12 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}

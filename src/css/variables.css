@@ -1,0 +1,236 @@
+/* VanillaBrick Design System - CSS Variables */
+
+:root {
+    /* ========== COLORS ========== */
+
+    /* Primary - Teal professional (crida atenció però sobri) */
+    --vb-primary-50: #f0fdfa;
+    --vb-primary-100: #ccfbf1;
+    --vb-primary-200: #99f6e4;
+    --vb-primary-300: #5eead4;
+    --vb-primary-400: #2dd4bf;
+    --vb-primary-500: #14b8a6;
+    /* Main primary */
+    --vb-primary-600: #0d9488;
+    --vb-primary-700: #0f766e;
+    --vb-primary-800: #115e59;
+    --vb-primary-900: #134e4a;
+
+    /* Neutral - Grays */
+    --vb-gray-50: #fafafa;
+    --vb-gray-100: #f4f4f5;
+    --vb-gray-200: #e4e4e7;
+    --vb-gray-300: #d4d4d8;
+    --vb-gray-400: #a1a1aa;
+    --vb-gray-500: #71717a;
+    --vb-gray-600: #52525b;
+    --vb-gray-700: #3f3f46;
+    --vb-gray-800: #27272a;
+    --vb-gray-900: #18181b;
+
+    /* Semantic colors */
+    --vb-success: #10b981;
+    --vb-success-light: #d1fae5;
+    --vb-warning: #f59e0b;
+    --vb-warning-light: #fef3c7;
+    --vb-error: #ef4444;
+    --vb-error-light: #fee2e2;
+    --vb-info: #3b82f6;
+    --vb-info-light: #dbeafe;
+
+    /* Surface colors */
+    --vb-background: #ffffff;
+    --vb-surface: #fafafa;
+    --vb-surface-hover: #f4f4f5;
+    --vb-border: #e4e4e7;
+    --vb-border-hover: #d4d4d8;
+
+    /* Text colors */
+    --vb-text-primary: #18181b;
+    --vb-text-secondary: #52525b;
+    --vb-text-tertiary: #a1a1aa;
+    --vb-text-inverse: #ffffff;
+
+    /* ========== TYPOGRAPHY ========== */
+
+    /* Font families - System stack (NO external dependencies) */
+    --vb-font-sans: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --vb-font-mono: "Cascadia Code", "Consolas", "Courier New", monospace;
+
+    /* Font sizes */
+    --vb-text-xs: 0.75rem;
+    /* 12px */
+    --vb-text-sm: 0.875rem;
+    /* 14px */
+    --vb-text-base: 1rem;
+    /* 16px */
+    --vb-text-lg: 1.125rem;
+    /* 18px */
+    --vb-text-xl: 1.25rem;
+    /* 20px */
+    --vb-text-2xl: 1.5rem;
+    /* 24px */
+    --vb-text-3xl: 1.875rem;
+    /* 30px */
+    --vb-text-4xl: 2.25rem;
+    /* 36px */
+
+    /* Font weights */
+    --vb-font-normal: 400;
+    --vb-font-medium: 500;
+    --vb-font-semibold: 600;
+    --vb-font-bold: 700;
+
+    /* Line heights */
+    --vb-leading-tight: 1.25;
+    --vb-leading-normal: 1.5;
+    --vb-leading-relaxed: 1.75;
+
+    /* ========== SPACING ========== */
+
+    /* Base: 4px system */
+    --vb-space-0: 0;
+    --vb-space-1: 0.25rem;
+    /* 4px */
+    --vb-space-2: 0.5rem;
+    /* 8px */
+    --vb-space-3: 0.75rem;
+    /* 12px */
+    --vb-space-4: 1rem;
+    /* 16px */
+    --vb-space-5: 1.25rem;
+    /* 20px */
+    --vb-space-6: 1.5rem;
+    /* 24px */
+    --vb-space-8: 2rem;
+    /* 32px */
+    --vb-space-10: 2.5rem;
+    /* 40px */
+    --vb-space-12: 3rem;
+    /* 48px */
+    --vb-space-16: 4rem;
+    /* 64px */
+
+    /* ========== BORDERS ========== */
+
+    --vb-radius-sm: 2px;
+    --vb-radius-md: 4px;
+    --vb-radius-lg: 6px;
+    --vb-radius-xl: 8px;
+    --vb-radius-full: 9999px;
+
+    --vb-border-width: 1px;
+    --vb-border-width-2: 2px;
+
+    /* ========== SHADOWS ========== */
+
+    /* Subtils però visibles */
+    --vb-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --vb-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --vb-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --vb-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+    /* Focus ring */
+    --vb-shadow-focus: 0 0 0 3px rgba(20, 184, 166, 0.2);
+
+    /* ========== TRANSITIONS ========== */
+
+    /* Ràpides per màxim rendiment */
+    --vb-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --vb-transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --vb-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ========== Z-INDEX ========== */
+
+    --vb-z-dropdown: 1000;
+    --vb-z-sticky: 1020;
+    --vb-z-fixed: 1030;
+    --vb-z-modal-backdrop: 1040;
+    --vb-z-modal: 1050;
+    --vb-z-popover: 1060;
+    --vb-z-tooltip: 1070;
+}
+
+/* ========== GLOBAL STYLES ========== */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--vb-font-sans);
+    font-size: var(--vb-text-base);
+    line-height: var(--vb-leading-normal);
+    color: var(--vb-text-primary);
+    background-color: var(--vb-background);
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin: 0;
+    font-weight: var(--vb-font-semibold);
+    line-height: var(--vb-leading-tight);
+    color: var(--vb-text-primary);
+}
+
+h1 {
+    font-size: var(--vb-text-3xl);
+}
+
+h2 {
+    font-size: var(--vb-text-2xl);
+}
+
+h3 {
+    font-size: var(--vb-text-xl);
+}
+
+h4 {
+    font-size: var(--vb-text-lg);
+}
+
+h5 {
+    font-size: var(--vb-text-base);
+}
+
+h6 {
+    font-size: var(--vb-text-sm);
+}
+
+/* Links */
+a {
+    color: var(--vb-primary-600);
+    text-decoration: none;
+    transition: color var(--vb-transition-fast);
+}
+
+a:hover {
+    color: var(--vb-primary-700);
+    text-decoration: underline;
+}
+
+/* Code */
+code,
+pre {
+    font-family: var(--vb-font-mono);
+    font-size: var(--vb-text-sm);
+}
+
+/* Selection */
+::selection {
+    background-color: var(--vb-primary-200);
+    color: var(--vb-text-primary);
+}
