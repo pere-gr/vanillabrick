@@ -1,6 +1,40 @@
 // Simple "Hello World" extension for VanillaBrick.
 // Load this file after ../dist/VanillaBrick.js.
 
+const DEMO_FORM_ITEMS = [
+  {
+    type: 'group',
+    items: [
+      {
+        type: 'field',
+        name: 'code',
+        label: 'Code',
+        controlType: 'input',
+        inputType: 'text',
+        span: 6
+      },
+      {
+        type: 'field',
+        name: 'name',
+        label: 'Name',
+        controlType: 'input',
+        inputType: 'text',
+        span: 6
+      },
+      {
+        type: 'field',
+        name: 'key',
+        label: 'Key',
+        controlType: 'input',
+        inputType: 'text',
+        span: 12
+      }
+    ]
+  }
+];
+
+window.DEMO_FORM_ITEMS = DEMO_FORM_ITEMS;
+
 (function (VanillaBrick) {
   console.warn("Installing demo extensions");
   if (!VanillaBrick || !VanillaBrick.extensions) {
@@ -20,8 +54,8 @@
      * @param {object} ext - Reference to the VanillaBrick extension configuration.
      * @returns {void}
      */
-    init: function (brick,ext) {
-      if(this.kind != "demo") return false;
+    init: function (brick, ext) {
+      if (this.kind != "demo") return false;
       console.log('[demoHelloWorld] init per brick', this.id, 'de tipus', this.kind);
       // Es pot retornar false per saltar la instal-lacio
       return true;
@@ -84,11 +118,11 @@
       //{ for: 'dom:mouse:down', handlers: [{ phase: 'on', fn: 'logDomEvent' }] },
       { for: 'dom:mouse:up', handlers: [{ phase: 'on', fn: 'logDomEvent' }] },
       { for: 'dom:*:*', handlers: [{ phase: 'after', fn: 'logAfterDomEvent' }] },
-      
+
     ],
     logBeforeDomEvent: function (ext, ev) {
       console.log('[demoDom] > before >', ev.name, ev);
-      this.css.setStyle("border","1px solid red");
+      this.css.setStyle("border", "1px solid red");
     },
     logDomEvent: function (ext, ev) {
       console.log('[demoDom] > on >', ev.name, ev);
@@ -96,8 +130,55 @@
     },
     logAfterDomEvent: function (ext, ev) {
       console.log('[demoDom] > before >', ev.name, ev);
-      this.css.setStyle("border","1px dashed #888");
+      this.css.setStyle("border", "1px dashed #888");
     },
   };
-})(window.VanillaBrick);
 
+  // Extension to inject demo items into forms
+  VanillaBrick.extensions.demoFormInjector = {
+    _name: 'demoFormInjector',
+    _for: ['form'], // Target forms
+
+    init: function () {
+      return true;
+    },
+
+    _listeners: [
+      /*
+      {
+        for: 'brick:ready:*',
+        handlers: [
+          { phase: 'before', fn: 'injectItems' }
+        ]
+      },
+      */
+      {
+        for: 'brick:ready:*',
+        handlers: [
+          { phase: 'after', fn: 'injectData' }
+        ]
+      }
+    ],
+
+    injectItems: function (ext, ev) {
+      // logic moved to form-items.js via brick-form-items attribute
+    },
+
+    injectData: function (ext, ev) {
+      // Simulate loading data into the form
+      // We use the store API which is now available on the form brick thanks to 'record' extension requiring 'store'
+      // Wait, 'record' requires 'store', so if 'form' brick uses 'record', it will have 'store'.
+
+      // Assuming the brick has the store extension loaded (which it should if we update dependencies or load it manually)
+      // Wait, store extension targets ['form', 'grid'].
+
+      if (this.brick.store && typeof this.brick.store.set === 'function') {
+        console.log("Injecting demo data into form", this.brick.id);
+        this.brick.store.set([
+          { code: '001', name: 'Demo Record', key: 12345 }
+        ]);
+      }
+    }
+  };
+
+})(window.VanillaBrick);

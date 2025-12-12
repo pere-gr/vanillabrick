@@ -1,4 +1,4 @@
-VanillaBrick.extensions.grid = {
+VanillaBrick.components.grid = {
   for: ['grid'],
   requires: ['dom'],
   ns: 'grid',

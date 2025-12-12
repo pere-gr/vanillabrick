@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Wire & Grid Focus Test</title>
+    <link rel="stylesheet" href="dist/vanillabrick.css">
+    <style>
+        .focused {
+            background-color: #e0f7fa;
+            outline: 2px solid #00acc1;
+        }
+
+        #logs {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 150px;
+            overflow: auto;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Wire & Grid Focus Test</h1>
+
+    <h2>Grid Focus</h2>
+    <div id="grid1" class="vb" data-kind="grid" data-store-data="[{name:'Alice'},{name:'Bob'},{name:'Charlie'}]">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+
+    <h2>Wire Test</h2>
+    <div id="brickA" class="vb" data-kind="brick" data-id="brick-a">Brick A</div>
+    <div id="brickB" class="vb" data-kind="brick" data-id="brick-b">Brick B</div>
+
+    <h3>Logs</h3>
+    <div id="logs"></div>
+
+    <script src="dist/vanillabrick.js"></script>
+    <script>
+        function log(msg) {
+            const div = document.getElementById('logs');
+            div.innerHTML += msg + '<br>';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const a = VanillaBrick.base.getBrick('brick-a');
+            const b = VanillaBrick.base.getBrick('brick-b');
+            const g = VanillaBrick.base.getBrick('grid1');
+
+            // Ensure wire service is running (it should be lazy loaded by brick A connection)
+            // But for debugging, we can check.
+
+            // 1. Check Wire
+            // A sends message, B should receive
+            if (a && b) {
+                b.events.on('ping', (ev) => {
+                    log('[SUCCESS] Brick B received "ping": ' + JSON.stringify(ev.data));
+                });
+
+                log('Brick A sending ping...');
+                // Wait a bit for connections to settle (extension initialization)
+                setTimeout(() => {
+                    if (a.wire && a.wire.send) {
+                        a.wire.send('ping', { msg: 'hello from A' });
+                    } else {
+                        log('[ERROR] Brick A has no wire extension? ' + !!a.wire);
+                    }
+                }, 500);
+            }
+
+            // 2. Check Grid Focus
+            // Listen for dom:row:focus
+            if (g) {
+                g.events.on('dom:row:focus', (ev) => {
+                    log('[SUCCESS] Grid focus event: row index ' + ev.data.index);
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

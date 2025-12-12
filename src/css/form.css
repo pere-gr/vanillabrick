@@ -1,0 +1,177 @@
+/* VanillaBrick Form System */
+
+/* Form container */
+.vb-form {
+    width: 100%;
+}
+
+/* Form group - uses row/col layout system */
+.vb-form-group {
+    margin-bottom: var(--vb-space-6);
+}
+
+/* Form field - individual field container */
+.vb-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Labels */
+.vb-form-field label {
+    font-weight: var(--vb-font-medium);
+    font-size: var(--vb-text-sm);
+    color: var(--vb-text-primary);
+    margin-bottom: 0;
+}
+
+/* Input fields */
+.vb-form-field input[type="text"],
+.vb-form-field input[type="email"],
+.vb-form-field input[type="password"],
+.vb-form-field input[type="number"],
+.vb-form-field input[type="tel"],
+.vb-form-field input[type="url"],
+.vb-form-field input[type="date"],
+.vb-form-field select,
+.vb-form-field textarea {
+    width: 100%;
+    padding: var(--vb-space-1) var(--vb-space-3);
+    border: var(--vb-border-width) solid var(--vb-border);
+    border-radius: var(--vb-radius-md);
+    font-size: var(--vb-text-sm);
+    font-family: inherit;
+    transition: border-color var(--vb-transition-fast), box-shadow var(--vb-transition-fast);
+    color: var(--vb-text-primary);
+    background-color: var(--vb-background);
+}
+
+.vb-form-field input:focus,
+.vb-form-field select:focus,
+.vb-form-field textarea:focus {
+    outline: none;
+    border-color: var(--vb-primary-500);
+    box-shadow: var(--vb-shadow-focus);
+}
+
+.vb-form-field input::placeholder,
+.vb-form-field textarea::placeholder {
+    color: var(--vb-text-tertiary);
+}
+
+/* Textarea */
+.vb-form-field textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* Select */
+.vb-form-field select {
+    cursor: pointer;
+    background-color: var(--vb-background);
+}
+
+/* Buttons */
+.vb-btn {
+    padding: var(--vb-space-1) var(--vb-space-4);
+    border: var(--vb-border-width) solid transparent;
+    border-radius: var(--vb-radius-md);
+    font-size: var(--vb-text-sm);
+    font-weight: var(--vb-font-medium);
+    cursor: pointer;
+    transition: background-color var(--vb-transition-fast),
+        border-color var(--vb-transition-fast),
+        box-shadow var(--vb-transition-fast);
+    font-family: inherit;
+}
+
+.vb-btn:hover {
+    box-shadow: var(--vb-shadow-sm);
+}
+
+.vb-btn:active {
+    transform: translateY(1px);
+}
+
+.vb-btn-primary {
+    background-color: var(--vb-primary-500);
+    color: var(--vb-text-inverse);
+    border-color: var(--vb-primary-500);
+}
+
+.vb-btn-primary:hover {
+    background-color: var(--vb-primary-600);
+    border-color: var(--vb-primary-600);
+}
+
+.vb-btn-secondary {
+    background-color: var(--vb-surface);
+    color: var(--vb-text-primary);
+    border-color: var(--vb-border);
+}
+
+.vb-btn-secondary:hover {
+    background-color: var(--vb-surface-hover);
+    border-color: var(--vb-border-hover);
+}
+
+/* Form actions - button container */
+.vb-form-actions {
+    display: flex;
+    gap: var(--vb-space-2);
+    margin-top: var(--vb-space-6);
+}
+
+/* Validation states */
+.vb-form-field.is-invalid input,
+.vb-form-field.is-invalid select,
+.vb-form-field.is-invalid textarea {
+    border-color: var(--vb-error);
+}
+
+.vb-form-field.is-invalid input:focus,
+.vb-form-field.is-invalid select:focus,
+.vb-form-field.is-invalid textarea:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.vb-form-field.is-valid input,
+.vb-form-field.is-valid select,
+.vb-form-field.is-valid textarea {
+    border-color: var(--vb-success);
+}
+
+.vb-form-field.is-valid input:focus,
+.vb-form-field.is-valid select:focus,
+.vb-form-field.is-valid textarea:focus {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* Helper text */
+.vb-form-field-help {
+    font-size: var(--vb-text-xs);
+    color: var(--vb-text-secondary);
+    margin-top: var(--vb-space-1);
+}
+
+.vb-form-field.is-invalid .vb-form-field-help {
+    color: var(--vb-error);
+}
+
+.vb-form-field.is-valid .vb-form-field-help {
+    color: var(--vb-success);
+}
+
+/* Disabled state */
+.vb-form-field input:disabled,
+.vb-form-field select:disabled,
+.vb-form-field textarea:disabled {
+    background-color: var(--vb-surface);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.vb-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

@@ -1,25 +1,93 @@
 <!doctype html>
 <html lang="ca">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VanillaBrick Demo</title>
+
+  <!-- VanillaBrick CSS -->
+  <link rel="stylesheet" href="./dist/vanillabrick.css">
+  <!-- Demo styles -->
   <link rel="stylesheet" href="./demos/demo.css">
+
+  <!-- VanillaBrick JS -->
   <script defer src="./dist/vanillabrick.js"></script>
   <script defer src="./demos/demo.js"></script>
 </head>
+
 <body>
-  <main>
-    <h1>VanillaBrick demo</h1>
-</main>
+  <div class="vb-container-fluid">
+    <header>
+      <h1>VanillaBrick Demo</h1>
+      <p>Grid layout system with brick grid and HTML form</p>
+    </header>
 
-  <table id="grid1" class="vb vb-grid" brick-kind="grid">
-    <thead>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <div class="vb-row">
+      <!-- Left column: Grid (brick) -->
+      <div class="vb-span-6">
+        <h2>Grid (Brick)</h2>
+        <table id="grid1" class="vb vb-grid" brick-kind="grid">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Right column: Form (HTML) -->
+      <div class="vb-span-6">
+        <h2>Form (HTML)</h2>
+        <form class="vb vb-form" brick-kind="form" brick-form-items="DEMO_FORM_ITEMS">
+          <!-- Form group 1: Code and Name in 2 columns -->
+          <div class="vb-form-group">
+            <div class="vb-row">
+              <div class="vb-span-6">
+                <div class="vb-form-field">
+                  <label for="code">Code</label>
+                  <input type="text" id="code" name="code" placeholder="Enter code">
+                </div>
+              </div>
+              <div class="vb-span-6">
+                <div class="vb-form-field">
+                  <label for="name">Name</label>
+                  <input type="text" id="name" name="name" placeholder="Enter name">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Form group 2: Email full width -->
+          <div class="vb-form-group">
+            <div class="vb-row">
+              <div class="vb-span-12">
+                <div class="vb-form-field">
+                  <label for="email">Email</label>
+                  <input type="email" id="email" name="email" placeholder="Enter email">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Form group 3: Description full width -->
+          <div class="vb-form-group">
+            <div class="vb-row">
+              <div class="vb-span-12">
+                <div class="vb-form-field">
+                  <label for="description">Description</label>
+                  <textarea id="description" name="description" rows="4" placeholder="Enter description"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Form actions -->
+          <div class="vb-form-actions">
+            <button type="submit" class="vb-btn vb-btn-primary">Save</button>
+            <button type="reset" class="vb-btn vb-btn-secondary">Reset</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </body>
+
 </html>
-
-
-
