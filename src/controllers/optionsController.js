@@ -142,7 +142,8 @@ OptionsController.prototype.setAsync = async function (key, value) {
     };
 
     // sense target: "options:value:"
-    await brick.events.fireAsync('options:value:', batchPayload);
+    // target "batch" per evitar el validator de 3 segments
+    await brick.events.fireAsync('options:value:batch', batchPayload);
     return this;
   }
 
@@ -153,13 +154,13 @@ OptionsController.prototype.setAsync = async function (key, value) {
     key: key,
     value: value,
     previous: oldValue,
-    options: this,
-    brick: brick
-  };
+      options: this,
+      brick: brick
+    };
 
-  // amb target: "options:value:<key>"
-  await brick.events.fireAsync('options:value:' + key, payload);
-  return this;
+    // amb target: "options:value:<key>"
+    await brick.events.fireAsync('options:value:' + key, payload);
+    return this;
 };
 
 /**
@@ -194,7 +195,8 @@ OptionsController.prototype.setSync = function (key, value) {
     };
 
     // sense target: "options:value:"
-    brick.events.fire('options:value:', batchPayload);
+    // target "batch" per evitar el validator de 3 segments
+    brick.events.fire('options:value:batch', batchPayload);
     return this;
   }
 

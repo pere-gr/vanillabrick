@@ -30,31 +30,31 @@ VanillaBrick.extensions.store = {
   // API pública sobre el brick (this === brick)
   brick: {
     load: function () {
-      return this.options.get('store.data',[]);
+      return this.options.get('store.data', []);
     },
     set: function (data) {
-      if(data === null) return;
-      const previous = this.options.get('store.data',[]);
+      if (data === null) return;
+      const previous = this.options.get('store.data', []);
       data = Array.isArray(data) ? data.slice() : [data];
-      
+
       this.events.fire('store:data:set', {
-          previous: previous,
-          data: data
-        });
-   
+        previous: previous,
+        data: data
+      });
+
       return data;
     },
     setAsync: async function (data) {
-      const previous = this.options.get('store.data',[]);
+      const previous = this.options.get('store.data', []);
       data = Array.isArray(data) ? data.slice() : [];
-      
+
       await this.events.fireAsync('store:data:set', {
-          previous: previous,
-          data: data
-        });
-   
+        previous: previous,
+        data: data
+      });
+
       return data;
-    },    
+    },
     all: function () {
       return this.store.load();
     },
@@ -77,16 +77,16 @@ VanillaBrick.extensions.store = {
       const cmp = typeof compareFn === 'function'
         ? function (a, b) { return compareFn(a, b, dir); }
         : function (a, b) {
-            const va = a && Object.prototype.hasOwnProperty.call(a, field) ? a[field] : undefined;
-            const vb = b && Object.prototype.hasOwnProperty.call(b, field) ? b[field] : undefined;
-            let res = 0;
-            if (va === vb) res = 0;
-            else if (va === undefined || va === null) res = -1;
-            else if (vb === undefined || vb === null) res = 1;
-            else if (typeof va === 'number' && typeof vb === 'number') res = va - vb;
-            else res = String(va).localeCompare(String(vb));
-            return dir === 'desc' ? -res : res;
-          };
+          const va = a && Object.prototype.hasOwnProperty.call(a, field) ? a[field] : undefined;
+          const vb = b && Object.prototype.hasOwnProperty.call(b, field) ? b[field] : undefined;
+          let res = 0;
+          if (va === vb) res = 0;
+          else if (va === undefined || va === null) res = -1;
+          else if (vb === undefined || vb === null) res = 1;
+          else if (typeof va === 'number' && typeof vb === 'number') res = va - vb;
+          else res = String(va).localeCompare(String(vb));
+          return dir === 'desc' ? -res : res;
+        };
       arr.sort(cmp);
       return arr;
     }
@@ -94,12 +94,12 @@ VanillaBrick.extensions.store = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function (ev) {
           //const storeData = this.brick.options.get('store:data', null);
           const storeData = this._normalizeArray(DATA_SAMPLE_ROWS, []);
-          this.brick.options.setSilent('store.data',storeData);
+          this.brick.options.setSilent('store.data', storeData);
         }
       }
     },
@@ -108,7 +108,8 @@ VanillaBrick.extensions.store = {
       on: {
         fn: function (ev) {
           const payload = (ev && ev.data) || null;
-          this.brick.options.setSilent('store.data',payload);
+          const data = payload && payload.data ? payload.data : [];
+          this.brick.options.setSilent('store.data', data);
         }
       }
     },
@@ -117,13 +118,13 @@ VanillaBrick.extensions.store = {
       on: {
         fn: function (ev) {
           const payload = (ev && ev.data) || {};
-          
+
           const field = payload.field || null;
           const dir = payload.dir || 'asc';
 
           if (!field || !this.brick) return;
           const sorted = this._sortRows(this.brick.store.load(), field, dir, payload.compare);
-          this.brick.options.setSilent("store.data",sorted);
+          this.brick.options.setSilent("store.data", sorted);
           ev.field = field;
           ev.dir = dir;
           ev.data = sorted;
@@ -132,8 +133,7 @@ VanillaBrick.extensions.store = {
     }
   ],
 
-  init: function () {},
+  init: function () { },
 
-  destroy: function () {}
+  destroy: function () { }
 };
-

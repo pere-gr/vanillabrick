@@ -10,14 +10,15 @@ VanillaBrick.extensions.domEvents = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           const el = this.brick.dom.element();
           if (!el || typeof el.addEventListener !== 'function') return;
-          const listeners = this.brick.options.get("dom.events.listeners",[]);
+          let listeners = this.brick.options.get("dom.events.listeners", []);
+          if (!Array.isArray(listeners)) listeners = [];
           const defaultMap = [
-            { type: 'click', eventName: 'dom:click:*' },
+            { type: 'click', eventName: 'dom:mouse:click' },
             { type: 'mouseenter', eventName: 'dom:hover:on' },
             { type: 'mouseleave', eventName: 'dom:hover:off' },
             { type: 'mousedown', eventName: 'dom:mouse:down' },
@@ -31,8 +32,8 @@ VanillaBrick.extensions.domEvents = {
                 domEvent: domEvent,
                 element: el,
               });
-            };
-            el.addEventListener(entry.type, handler.bind(this));
+            }.bind(this);
+            el.addEventListener(entry.type, handler);
             listeners.push({ type: entry.type, handler: handler, source: 'default' });
           }
           this.brick.options.setSilent("dom.events.listeners", listeners);
@@ -40,23 +41,23 @@ VanillaBrick.extensions.domEvents = {
       }
     },
     {
-      for: 'brick:destroy:*',
+      for: 'brick:status:destroyed',
       before: {
         fn: function () {
           const el = this.brick && this.brick.dom.element && this.brick.dom.element();
           if (!el || typeof el.removeEventListener !== 'function') return;
-          const listeners = this._listeners || [];
+          const listeners = this.brick.options.get("dom.events.listeners", []);
+          if (!Array.isArray(listeners)) return;
           for (let i = 0; i < listeners.length; i += 1) {
             const ln = listeners[i];
             el.removeEventListener(ln.type, ln.handler, ln.options);
           }
-          this._listeners = [];
+          this.brick.options.setSilent("dom.events.listeners", []);
         }
       }
     }
   ],
 
-  init: function() {},
-  destroy: function () {}
+  init: function () { },
+  destroy: function () { }
 };
-

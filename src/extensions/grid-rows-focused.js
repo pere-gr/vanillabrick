@@ -10,7 +10,7 @@ VanillaBrick.extensions.rowsFocused = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function () {
                     const brick = this.brick;

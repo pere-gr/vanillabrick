@@ -61,10 +61,10 @@ window.DEMO_FORM_ITEMS = DEMO_FORM_ITEMS;
       return true;
     },
 
-    // Listener d'exemple: respon als events "brick:ready:*"
+    // Listener d'exemple: respon als events "brick:status:ready"
     _listeners: [
       {
-        for: 'brick:ready:*',
+        for: 'brick:status:ready',
         handlers: [
           { phase: 'on', fn: 'onReady' }
         ]
@@ -78,7 +78,7 @@ window.DEMO_FORM_ITEMS = DEMO_FORM_ITEMS;
     ],
 
     /**
-     * Handles "brick:ready:*" events and triggers demo:say:hello.
+     * Handles "brick:status:ready" events and triggers demo:say:hello.
      * @param {object} ext - Extension configuration reference.
      * @param {VanillaBrickEvent} ev - Event object received by this brick.
      * @returns {void}
@@ -146,14 +146,14 @@ window.DEMO_FORM_ITEMS = DEMO_FORM_ITEMS;
     _listeners: [
       /*
       {
-        for: 'brick:ready:*',
+        for: 'brick:status:ready',
         handlers: [
           { phase: 'before', fn: 'injectItems' }
         ]
       },
       */
       {
-        for: 'brick:ready:*',
+        for: 'brick:status:ready',
         handlers: [
           { phase: 'after', fn: 'injectData' }
         ]

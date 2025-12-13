@@ -190,7 +190,7 @@ ExtensionsController.prototype._ensureDestroyHook = function () {
   const self = this;
 
   brick._controllers.events.on(
-    'brick:destroy:*',
+    'brick:status:destroyed',
     'on',
     0,
     function () {

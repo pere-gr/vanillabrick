@@ -40,7 +40,7 @@ VanillaBrick.extensions.record = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function (ev) {
                     const data = this.brick.store.load();

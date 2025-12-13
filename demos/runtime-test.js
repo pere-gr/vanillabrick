@@ -44,10 +44,10 @@
 
         events: [
             {
-                for: 'brick:ready:*',
+                for: 'brick:status:ready',
                 on: {
                     fn: function (ev) {
-                        console.log('[RuntimeTest] brick:ready handler - testing error handling');
+                        console.log('[RuntimeTest] brick:status:ready handler - testing error handling');
 
                         // Test 1: Call working method
                         try {

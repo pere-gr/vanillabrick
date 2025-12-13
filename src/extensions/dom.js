@@ -9,24 +9,27 @@ VanillaBrick.extensions.dom = {
       return this.options.get('dom.element', null);
     },
     on: function (type, handler, options) {
-      const el = this.options.get('dom.element',null);
+      const el = this.options.get('dom.element', null);
       if (!el || typeof el.addEventListener !== 'function' || typeof handler !== 'function') return;
       el.addEventListener(type, handler, options);
-      const listeners = this.brick.options.get('dom.listeners',[]);
+      let listeners = this.options.get('dom.listeners', []);
       if (!Array.isArray(listeners)) listeners = [];
       listeners.push({ type: type, handler: handler, options: options, source: 'api' });
+      this.options.setSilent('dom.listeners', listeners);
     },
     off: function (type, handler, options) {
-      const el = this.options.get('dom.element',null);
+      const el = this.options.get('dom.element', null);
       if (!el || typeof el.removeEventListener !== 'function' || typeof handler !== 'function') return;
       el.removeEventListener(type, handler, options);
-      const listeners = this.brick.options.get('dom.listeners',[]);
+      const listeners = this.options.get('dom.listeners', []);
+      if (!Array.isArray(listeners)) return;
       for (let i = listeners.length - 1; i >= 0; i -= 1) {
         const ln = listeners[i];
         if (ln.type === type && ln.handler === handler) {
           listeners.splice(i, 1);
         }
       }
+      this.options.setSilent('dom.listeners', listeners);
     }
   },
 
@@ -89,4 +92,3 @@ VanillaBrick.extensions.dom = {
     }
   }
 };
-

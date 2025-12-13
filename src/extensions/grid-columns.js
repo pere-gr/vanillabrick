@@ -6,7 +6,7 @@ VanillaBrick.extensions.columns = {
 
   brick: {
     get: function () {
-      return this.options.get("grid.columns",[]);
+      return this.options.get("grid.columns", []);
     },
     sort: function (field, dir) {
       const cols = this.columns.get();
@@ -31,7 +31,7 @@ VanillaBrick.extensions.columns = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           const columns = this.brick.columns.get();
@@ -72,22 +72,22 @@ VanillaBrick.extensions.columns = {
       for: 'store:data:sort',
       after: {
         fn: function (ev) {
-          this.brick.options.setSilent("grid.sort",{ field: ev.field, dir: ev.dir || 'asc' });
+          this.brick.options.setSilent("grid.sort", { field: ev.field, dir: ev.dir || 'asc' });
         }
       }
     }
   ],
 
-  init: function () {},
+  init: function () { },
 
-  destroy: function () {},
+  destroy: function () { },
 
-  options:{
-    grid:{
-        columns: [
-            { datafield: 'code', label: 'Code', sortable: true },
-            { datafield: 'name', label: 'Name', sortable: true },
-        ]
+  options: {
+    grid: {
+      columns: [
+        { datafield: 'code', label: 'Code', sortable: true },
+        { datafield: 'name', label: 'Name', sortable: true },
+      ]
     }
   }
 };

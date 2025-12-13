@@ -37,6 +37,7 @@ function Brick(options) {
     enumerable: true
   });
   const controllers = Object.freeze({
+    status: new VanillaBrick.controllers.status(this),
     runtime: new VanillaBrick.controllers.runtime(this),
     options: new VanillaBrick.controllers.options(this, opts),
     events: new VanillaBrick.controllers.events(this),
@@ -50,11 +51,11 @@ function Brick(options) {
   });
 
   controllers.extensions.applyAll();
-  controllers.events.fireAsync('brick:ready:now', { options: opts });
+  controllers.status.set('ready', { options: opts });
 }
 
 Brick.prototype.destroy = function () {
-  this._controllers.events.fire('brick:destroy:now', {});
+  this._controllers.status.set('destroyed');
 };
 
 Object.defineProperty(Brick, '_idCounter', {
@@ -103,7 +104,7 @@ VanillaBrick.components.form = {
     events: [
         // Basic lifecycle events
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function () {
                     // Initialization logic
@@ -197,7 +198,7 @@ VanillaBrick.components.grid = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           this._findTable();
@@ -742,7 +743,7 @@ ExtensionsController.prototype._ensureDestroyHook = function () {
   const self = this;
 
   brick._controllers.events.on(
-    'brick:destroy:*',
+    'brick:status:destroyed',
     'on',
     0,
     function () {
@@ -1033,7 +1034,8 @@ OptionsController.prototype.setAsync = async function (key, value) {
     };
 
     // sense target: "options:value:"
-    await brick.events.fireAsync('options:value:', batchPayload);
+    // target "batch" per evitar el validator de 3 segments
+    await brick.events.fireAsync('options:value:batch', batchPayload);
     return this;
   }
 
@@ -1044,13 +1046,13 @@ OptionsController.prototype.setAsync = async function (key, value) {
     key: key,
     value: value,
     previous: oldValue,
-    options: this,
-    brick: brick
-  };
+      options: this,
+      brick: brick
+    };
 
-  // amb target: "options:value:<key>"
-  await brick.events.fireAsync('options:value:' + key, payload);
-  return this;
+    // amb target: "options:value:<key>"
+    await brick.events.fireAsync('options:value:' + key, payload);
+    return this;
 };
 
 /**
@@ -1085,7 +1087,8 @@ OptionsController.prototype.setSync = function (key, value) {
     };
 
     // sense target: "options:value:"
-    brick.events.fire('options:value:', batchPayload);
+    // target "batch" per evitar el validator de 3 segments
+    brick.events.fire('options:value:batch', batchPayload);
     return this;
   }
 
@@ -1361,6 +1364,74 @@ VanillaBrick.controllers = VanillaBrick.controllers || {};
 VanillaBrick.controllers.runtime = RuntimeController;
 
 
+
+/**
+ * Status Controller
+ * Manages the lifecycle state of the brick via EventBus.
+ * @constructor
+ */
+function StatusController(brick) {
+    this.brick = brick;
+    this._status = 'initializing';
+    this._listening = false;
+
+    // Expose public Status API on the brick
+    var self = this;
+    if (brick) {
+        brick.status = {
+            get: function () {
+                return self.get();
+            },
+            set: function (newStatus) {
+                return self.set(newStatus);
+            },
+            is: function (status) {
+                return self.is(status);
+            }
+        };
+    }
+}
+
+StatusController.prototype.get = function () {
+    return this._status;
+};
+
+StatusController.prototype.set = function (newStatus, payload) {
+    // Fallback: if events system is not available yet (very early init), just set it.
+    if (!this.brick.events) {
+        this._status = newStatus;
+        return;
+    }
+
+    // Lazy registration: ensure internal state is updated via EventBus 'on' phase
+    if (!this._listening) {
+        var self = this;
+        // Wildcard listener to catch ANY status change event (brick:status:ready, etc.)
+        this.brick.events.on('brick:status:*', 'on', function (ev) {
+            // Update internal state from payload
+            if (ev.data && ev.data.status) {
+                self._status = ev.data.status;
+            }
+        });
+        this._listening = true;
+    }
+
+    // Prepare event data mixing standard fields with payload
+    var eventData = Object.assign({}, payload || {}, {
+        status: newStatus,
+        from: this._status
+    });
+
+    // Fire specific event dynamic name: e.g., "brick:status:ready"
+    this.brick.events.fire('brick:status:' + newStatus, eventData);
+};
+
+StatusController.prototype.is = function (status) {
+    return this._status === status;
+};
+
+VanillaBrick.controllers.status = StatusController;
+
 VanillaBrick.extensions.domCss = {
   for: '*',
   requires: ['dom'],
@@ -1482,14 +1553,15 @@ VanillaBrick.extensions.domEvents = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           const el = this.brick.dom.element();
           if (!el || typeof el.addEventListener !== 'function') return;
-          const listeners = this.brick.options.get("dom.events.listeners",[]);
+          let listeners = this.brick.options.get("dom.events.listeners", []);
+          if (!Array.isArray(listeners)) listeners = [];
           const defaultMap = [
-            { type: 'click', eventName: 'dom:click:*' },
+            { type: 'click', eventName: 'dom:mouse:click' },
             { type: 'mouseenter', eventName: 'dom:hover:on' },
             { type: 'mouseleave', eventName: 'dom:hover:off' },
             { type: 'mousedown', eventName: 'dom:mouse:down' },
@@ -1503,8 +1575,8 @@ VanillaBrick.extensions.domEvents = {
                 domEvent: domEvent,
                 element: el,
               });
-            };
-            el.addEventListener(entry.type, handler.bind(this));
+            }.bind(this);
+            el.addEventListener(entry.type, handler);
             listeners.push({ type: entry.type, handler: handler, source: 'default' });
           }
           this.brick.options.setSilent("dom.events.listeners", listeners);
@@ -1512,26 +1584,26 @@ VanillaBrick.extensions.domEvents = {
       }
     },
     {
-      for: 'brick:destroy:*',
+      for: 'brick:status:destroyed',
       before: {
         fn: function () {
           const el = this.brick && this.brick.dom.element && this.brick.dom.element();
           if (!el || typeof el.removeEventListener !== 'function') return;
-          const listeners = this._listeners || [];
+          const listeners = this.brick.options.get("dom.events.listeners", []);
+          if (!Array.isArray(listeners)) return;
           for (let i = 0; i < listeners.length; i += 1) {
             const ln = listeners[i];
             el.removeEventListener(ln.type, ln.handler, ln.options);
           }
-          this._listeners = [];
+          this.brick.options.setSilent("dom.events.listeners", []);
         }
       }
     }
   ],
 
-  init: function() {},
-  destroy: function () {}
+  init: function () { },
+  destroy: function () { }
 };
-
 
 VanillaBrick.extensions.dom = {
   for: '*',
@@ -1544,24 +1616,27 @@ VanillaBrick.extensions.dom = {
       return this.options.get('dom.element', null);
     },
     on: function (type, handler, options) {
-      const el = this.options.get('dom.element',null);
+      const el = this.options.get('dom.element', null);
       if (!el || typeof el.addEventListener !== 'function' || typeof handler !== 'function') return;
       el.addEventListener(type, handler, options);
-      const listeners = this.brick.options.get('dom.listeners',[]);
+      let listeners = this.options.get('dom.listeners', []);
       if (!Array.isArray(listeners)) listeners = [];
       listeners.push({ type: type, handler: handler, options: options, source: 'api' });
+      this.options.setSilent('dom.listeners', listeners);
     },
     off: function (type, handler, options) {
-      const el = this.options.get('dom.element',null);
+      const el = this.options.get('dom.element', null);
       if (!el || typeof el.removeEventListener !== 'function' || typeof handler !== 'function') return;
       el.removeEventListener(type, handler, options);
-      const listeners = this.brick.options.get('dom.listeners',[]);
+      const listeners = this.options.get('dom.listeners', []);
+      if (!Array.isArray(listeners)) return;
       for (let i = listeners.length - 1; i >= 0; i -= 1) {
         const ln = listeners[i];
         if (ln.type === type && ln.handler === handler) {
           listeners.splice(i, 1);
         }
       }
+      this.options.setSilent('dom.listeners', listeners);
     }
   },
 
@@ -1624,7 +1699,6 @@ VanillaBrick.extensions.dom = {
     }
   }
 };
-
 
 VanillaBrick.extensions.items = {
     for: ['form'],
@@ -1762,7 +1836,7 @@ VanillaBrick.extensions.items = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             before: {
                 fn: function (ev) {
                     // Start fresh
@@ -1870,7 +1944,7 @@ VanillaBrick.extensions.record = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function (ev) {
                     const data = this.brick.store.load();
@@ -1909,7 +1983,7 @@ VanillaBrick.extensions.columns = {
 
   brick: {
     get: function () {
-      return this.options.get("grid.columns",[]);
+      return this.options.get("grid.columns", []);
     },
     sort: function (field, dir) {
       const cols = this.columns.get();
@@ -1934,7 +2008,7 @@ VanillaBrick.extensions.columns = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           const columns = this.brick.columns.get();
@@ -1975,22 +2049,22 @@ VanillaBrick.extensions.columns = {
       for: 'store:data:sort',
       after: {
         fn: function (ev) {
-          this.brick.options.setSilent("grid.sort",{ field: ev.field, dir: ev.dir || 'asc' });
+          this.brick.options.setSilent("grid.sort", { field: ev.field, dir: ev.dir || 'asc' });
         }
       }
     }
   ],
 
-  init: function () {},
+  init: function () { },
 
-  destroy: function () {},
+  destroy: function () { },
 
-  options:{
-    grid:{
-        columns: [
-            { datafield: 'code', label: 'Code', sortable: true },
-            { datafield: 'name', label: 'Name', sortable: true },
-        ]
+  options: {
+    grid: {
+      columns: [
+        { datafield: 'code', label: 'Code', sortable: true },
+        { datafield: 'name', label: 'Name', sortable: true },
+      ]
     }
   }
 };
@@ -2009,7 +2083,7 @@ VanillaBrick.extensions.rowsFocused = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function () {
                     const brick = this.brick;
@@ -2160,7 +2234,7 @@ VanillaBrick.extensions.rows = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           this.brick.rows.render();
@@ -2177,9 +2251,9 @@ VanillaBrick.extensions.rows = {
     }
   ],
 
-  init: function () {},
+  init: function () { },
 
-  destroy: function () {}
+  destroy: function () { }
 };
 
 
@@ -2215,31 +2289,31 @@ VanillaBrick.extensions.store = {
   // API pública sobre el brick (this === brick)
   brick: {
     load: function () {
-      return this.options.get('store.data',[]);
+      return this.options.get('store.data', []);
     },
     set: function (data) {
-      if(data === null) return;
-      const previous = this.options.get('store.data',[]);
+      if (data === null) return;
+      const previous = this.options.get('store.data', []);
       data = Array.isArray(data) ? data.slice() : [data];
-      
+
       this.events.fire('store:data:set', {
-          previous: previous,
-          data: data
-        });
-   
+        previous: previous,
+        data: data
+      });
+
       return data;
     },
     setAsync: async function (data) {
-      const previous = this.options.get('store.data',[]);
+      const previous = this.options.get('store.data', []);
       data = Array.isArray(data) ? data.slice() : [];
-      
+
       await this.events.fireAsync('store:data:set', {
-          previous: previous,
-          data: data
-        });
-   
+        previous: previous,
+        data: data
+      });
+
       return data;
-    },    
+    },
     all: function () {
       return this.store.load();
     },
@@ -2262,16 +2336,16 @@ VanillaBrick.extensions.store = {
       const cmp = typeof compareFn === 'function'
         ? function (a, b) { return compareFn(a, b, dir); }
         : function (a, b) {
-            const va = a && Object.prototype.hasOwnProperty.call(a, field) ? a[field] : undefined;
-            const vb = b && Object.prototype.hasOwnProperty.call(b, field) ? b[field] : undefined;
-            let res = 0;
-            if (va === vb) res = 0;
-            else if (va === undefined || va === null) res = -1;
-            else if (vb === undefined || vb === null) res = 1;
-            else if (typeof va === 'number' && typeof vb === 'number') res = va - vb;
-            else res = String(va).localeCompare(String(vb));
-            return dir === 'desc' ? -res : res;
-          };
+          const va = a && Object.prototype.hasOwnProperty.call(a, field) ? a[field] : undefined;
+          const vb = b && Object.prototype.hasOwnProperty.call(b, field) ? b[field] : undefined;
+          let res = 0;
+          if (va === vb) res = 0;
+          else if (va === undefined || va === null) res = -1;
+          else if (vb === undefined || vb === null) res = 1;
+          else if (typeof va === 'number' && typeof vb === 'number') res = va - vb;
+          else res = String(va).localeCompare(String(vb));
+          return dir === 'desc' ? -res : res;
+        };
       arr.sort(cmp);
       return arr;
     }
@@ -2279,12 +2353,12 @@ VanillaBrick.extensions.store = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function (ev) {
           //const storeData = this.brick.options.get('store:data', null);
           const storeData = this._normalizeArray(DATA_SAMPLE_ROWS, []);
-          this.brick.options.setSilent('store.data',storeData);
+          this.brick.options.setSilent('store.data', storeData);
         }
       }
     },
@@ -2293,7 +2367,8 @@ VanillaBrick.extensions.store = {
       on: {
         fn: function (ev) {
           const payload = (ev && ev.data) || null;
-          this.brick.options.setSilent('store.data',payload);
+          const data = payload && payload.data ? payload.data : [];
+          this.brick.options.setSilent('store.data', data);
         }
       }
     },
@@ -2302,13 +2377,13 @@ VanillaBrick.extensions.store = {
       on: {
         fn: function (ev) {
           const payload = (ev && ev.data) || {};
-          
+
           const field = payload.field || null;
           const dir = payload.dir || 'asc';
 
           if (!field || !this.brick) return;
           const sorted = this._sortRows(this.brick.store.load(), field, dir, payload.compare);
-          this.brick.options.setSilent("store.data",sorted);
+          this.brick.options.setSilent("store.data", sorted);
           ev.field = field;
           ev.dir = dir;
           ev.data = sorted;
@@ -2317,11 +2392,10 @@ VanillaBrick.extensions.store = {
     }
   ],
 
-  init: function () {},
+  init: function () { },
 
-  destroy: function () {}
+  destroy: function () { }
 };
-
 
 VanillaBrick.extensions.wire = {
     for: ['*'], // Available to all bricks (except maybe services themselves? But services might want to use wire too)
@@ -2394,7 +2468,7 @@ VanillaBrick.extensions.wire = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function () {
                     this._connect();

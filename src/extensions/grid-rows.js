@@ -47,7 +47,7 @@ VanillaBrick.extensions.rows = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           this.brick.rows.render();
@@ -64,8 +64,8 @@ VanillaBrick.extensions.rows = {
     }
   ],
 
-  init: function () {},
+  init: function () { },
 
-  destroy: function () {}
+  destroy: function () { }
 };
 

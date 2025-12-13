@@ -24,7 +24,7 @@ VanillaBrick.components.form = {
     events: [
         // Basic lifecycle events
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function () {
                     // Initialization logic

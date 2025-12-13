@@ -1,10 +1,10 @@
 # VanillaBrick
 
-VanillaBrick is an experimental **vanilla-JavaScript UI micro-framework** built around “bricks”:
+VanillaBrick is an experimental **vanilla-JavaScript UI micro-framework** built around "bricks":
 small, self-contained components (grids, forms, background services, etc.) wired together by
 a powerful event bus and an extensible plugin system.
 
-> **Status:** early alpha – architecture is still moving, APIs will break.  
+> **Status:** early alpha -- architecture is still moving, APIs will break.  
 > **Goal:** a real playground for enterprise-style components (grids/forms) and
 > headless services, with strong lifecycle & events, **zero runtime dependencies**
 > and a **single JS file**.
@@ -15,17 +15,17 @@ a powerful event bus and an extensible plugin system.
 
 Most component libraries give you lots of widgets but very little control over what happens
 **before** and **after** something changes. You usually get a single callback (`onChange`),
-often at the wrong time, and then you’re fighting the framework.
+often at the wrong time, and then you're fighting the framework.
 
 VanillaBrick is an experiment to flip that around:
 
-- Every interesting thing is an **event** with 3 phases: `before` → `on` → `after`.
+- Every interesting thing is an **event** with 3 phases: `before` -> `on` -> `after`.
 - Events are named strictly `namespace:type:target` (3 segments).
 - Listeners can use wildcards (`*`) to match any segment.
 - Extensions subscribe to those events and can **cancel**, **modify**, or **react** to them.
-- Components stay small and composable; “behaviour” lives in extensions and services.
+- Components stay small and composable; "behaviour" lives in extensions and services.
 
-All of this runs on plain JS – no bundler required to *use* it.
+All of this runs on plain JS -- no bundler required to *use* it.
 
 ---
 
@@ -47,14 +47,14 @@ All of this runs on plain JS – no bundler required to *use* it.
   services, data pipelines, orchestration logic, etc.
 
 - **Event bus with phases**  
-  - Event names like `brick:ready:now`, `store:data:set`, `store:data:sort`.  
+  - Event names like `brick:status:ready`, `store:data:set`, `store:data:sort`.  
   - 3 phases: `before`, `on`, `after`.  
   - Synchronous `fire()` and async `fireAsync()`.
 
 - **Extension system**  
   - Extensions declare:
     - `for`: which brick kinds they apply to.
-    - `requires`: which brick namespaces must exist (`dom`, `store`, …).
+    - `requires`: which brick namespaces must exist (`dom`, `store`, etc.).
     - `ns`: namespace where their public API will live on the brick.
     - `brick`: methods exported to `brick[ns].*` (public API).
     - `extension`: internal helpers (`this` is the extension instance).
@@ -65,7 +65,7 @@ All of this runs on plain JS – no bundler required to *use* it.
 - **Auto-bootstrap from the DOM (optional)**  
   Any element with `class="vb"` becomes a brick; the `kind` is read from
   `brick-kind`, `data-kind` or `data-brick-kind`. The `dom` extension is wired
-  automatically with the element as the brick’s root.
+  automatically with the element as the brick's root.
 
   This is just a convenience for **UI bricks**.  
   You can also create bricks manually from JS for **headless bricks / services**.
@@ -75,7 +75,7 @@ All of this runs on plain JS – no bundler required to *use* it.
   - `columns` extension: header rendering + sorting.  
   - `rows` extension: body rendering.  
   - `store` extension: in-memory data with `store.data:*` events.  
-  - Click on a sortable header → raises `store:data:sort` → rows re-render.
+  - Click on a sortable header -> raises `store:data:sort` -> rows re-render.
 
 ---
 
@@ -119,10 +119,10 @@ Minimal example (adapted from the demo):
 
 When the DOM is ready, VanillaBrick automatically:
 
-1. Finds `\.vb` elements.
+1. Finds `.vb` elements.
 2. Creates a `VanillaBrick.brick` for each one.
-3. Applies all matching extensions (dom, store, grid, columns, rows, …).
-4. Fires `brick:ready:now`.
+3. Applies all matching extensions (dom, store, grid, columns, rows, etc.).
+4. Fires `brick:status:ready`.
 
 You can then grab the instance from JS:
 
@@ -165,7 +165,7 @@ Each brick:
 Internally, controllers live under `brick._controllers`, but each exposes a small public API
 on the brick:
 
-- `brick.options.get(...)`, `set(...)`, `all()`, …  
+- `brick.options.get(...)`, `set(...)`, `all()`, etc.  
 - `brick.events.fire(...)`, `fireAsync(...)`, `on(...)`.
 
 ### Options controller
@@ -181,7 +181,7 @@ grid.options.set('grid.columns', [
 const cols = grid.options.get('grid.columns');
 ```
 
-Extensions can provide default options (they’re applied silently during install).
+Extensions can provide default options (they're applied silently during install).
 
 ### Event bus
 
@@ -195,7 +195,7 @@ namespace:type:target
 **Important**: You must provide exactly 3 segments. No more, no less.
 Wildcards (`*`) are allowed in listeners, but **forbidden** when firing events.
 Examples:
-- `brick:ready:now`
+- `brick:status:ready`
 - `store:data:set`
 - `store:data:sort`
 - `dom:click:my-btn`
@@ -243,7 +243,7 @@ VanillaBrick.extensions.columns = {
   // Event subscriptions
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function (ev) {
           // this === extension instance
@@ -284,7 +284,6 @@ At install time the extensions controller:
 
 ---
 
-
 ## Contracts & Conventions
 
 To keep sanity in a loosely coupled system, VanillaBrick enforces these strict rules:
@@ -304,8 +303,8 @@ Events **MUST** follow the 3-segment format: `namespace:type:target`.
 ### 2. Reserved Events
 | Event | When |
 |-------|------|
-| `brick:ready:now` | Fired when the brick is fully initialized and extensions are applied. |
-| `brick:destroy:now` | Fired just before the brick is dismantled. |
+| `brick:status:ready` | Fired when the brick transitions to 'ready' state (fully initialized and extensions are applied). |
+| `brick:status:destroyed` | Fired when the brick transitions to 'destroyed' state (just before the brick is dismantled). |
 
 ### 3. Lifecycle Phases
 Every event flows through 3 phases. Extensions should choose the right one:
@@ -317,15 +316,15 @@ Every event flows through 3 phases. Extensions should choose the right one:
 
 ## Current extensions (alpha)
 
-This list will change, but right now you’ll find things like:
+This list will change, but right now you'll find things like:
 
-- `dom` – resolve the main DOM element for a brick and manage DOM event listeners.  
-- `domCss` – tiny helper layer: `brick.css.addClass`, `removeClass`, `show`, `hide`, `setStyle`, …  
-- `domEvents` – maps native DOM events to VanillaBrick events (click, mouseover, etc.).  
-- `store` – basic in-memory data store for grids / forms (`store.data:*` events).  
-- `grid` – base grid behavior.  
-- `columns` – grid header rendering + sorting logic.  
-- `rows` – grid body rendering on `brick:ready` and when data changes.  
+- `dom` - resolve the main DOM element for a brick and manage DOM event listeners.  
+- `domCss` - tiny helper layer: `brick.css.addClass`, `removeClass`, `show`, `hide`, `setStyle`, etc.  
+- `domEvents` - maps native DOM events to VanillaBrick events (click, mouseover, etc.).  
+- `store` - basic in-memory data store for grids / forms (`store.data:*` events).  
+- `grid` - base grid behavior.  
+- `columns` - grid header rendering + sorting logic.  
+- `rows` - grid body rendering on `brick:status:ready` and when data changes.  
 
 ---
 
@@ -357,7 +356,7 @@ is designed with this kind of service in mind.
 
 ## Roadmap
 
-> 🧠 **Technical Deep Dive:** For a detailed breakdown of architectural decisions, performance optimizations (like Zero-Bind or Batching), and future core features, see [ROADMAP.md](./ROADMAP.md).
+> Heads-up: **Technical Deep Dive:** For a detailed breakdown of architectural decisions, performance optimizations (like Zero-Bind or Batching), and future core features, see [ROADMAP.md](./ROADMAP.md).
 
 Short-term ideas:
 
@@ -373,7 +372,7 @@ Non-goals (for now):
 
 - No JSX / virtual DOM.
 - No mandatory build step to *use* VanillaBrick (only to develop it).
-- No heavy theming engine – CSS classes + small helpers should be enough.
+- No heavy theming engine -- CSS classes + small helpers should be enough.
 
 ---
 
@@ -392,8 +391,4 @@ Right now this is mostly a personal playground, but issues and suggestions are w
 
 ## License
 
-MIT – see [LICENSE](./LICENSE) for details.
-
-
-
-
+MIT -- see [LICENSE](./LICENSE) for details.

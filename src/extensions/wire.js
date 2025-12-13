@@ -69,7 +69,7 @@ VanillaBrick.extensions.wire = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             on: {
                 fn: function () {
                     this._connect();

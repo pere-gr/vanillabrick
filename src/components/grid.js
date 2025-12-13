@@ -75,7 +75,7 @@ VanillaBrick.components.grid = {
 
   events: [
     {
-      for: 'brick:ready:*',
+      for: 'brick:status:ready',
       on: {
         fn: function () {
           this._findTable();

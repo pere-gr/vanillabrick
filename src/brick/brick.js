@@ -21,6 +21,7 @@ function Brick(options) {
     enumerable: true
   });
   const controllers = Object.freeze({
+    status: new VanillaBrick.controllers.status(this),
     runtime: new VanillaBrick.controllers.runtime(this),
     options: new VanillaBrick.controllers.options(this, opts),
     events: new VanillaBrick.controllers.events(this),
@@ -34,11 +35,11 @@ function Brick(options) {
   });
 
   controllers.extensions.applyAll();
-  controllers.events.fireAsync('brick:ready:now', { options: opts });
+  controllers.status.set('ready', { options: opts });
 }
 
 Brick.prototype.destroy = function () {
-  this._controllers.events.fire('brick:destroy:now', {});
+  this._controllers.status.set('destroyed');
 };
 
 Object.defineProperty(Brick, '_idCounter', {

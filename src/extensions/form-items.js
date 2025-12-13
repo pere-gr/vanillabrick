@@ -134,7 +134,7 @@ VanillaBrick.extensions.items = {
 
     events: [
         {
-            for: 'brick:ready:*',
+            for: 'brick:status:ready',
             before: {
                 fn: function (ev) {
                     // Start fresh
