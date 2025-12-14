@@ -40,7 +40,7 @@ All of this runs on plain JS -- no bundler required to *use* it.
   - an **options controller** (`brick.options.*`),
   - an **event bus controller** (`brick.events.*`),
   - an **extensions controller** that installs plugins based on `for` / `requires`.
-  - a **runtime controller** (`brick.runtime.*`) that wraps code execution for safety and debugging.
+  - a **runtime controller** (`brick.runtime.*`) that wraps code execution for safety and debugging (zero-bind: no `.bind`, shared wrappers; `this` inside APIs/handlers/helpers exposes `{ brick, ext }`).
 
   A brick **does not need a DOM element**.  
   You can use bricks as pure, headless components (state + events + extensions) to implement

@@ -16,6 +16,17 @@ function ExtensionsController(brick) {
   this._destroyHook = false;
 }
 
+function isArrowFunction(fn) {
+  if (typeof fn !== 'function') return false;
+  // Arrow functions have no prototype and typically stringify with "=>"
+  if (fn.prototype) return false;
+  try {
+    return fn.toString().indexOf('=>') !== -1;
+  } catch (e) {
+    return false;
+  }
+}
+
 ExtensionsController.prototype.applyAll = function () {
   const registry = VanillaBrick.controllers.extensionsRegistry;
   if (!registry || typeof registry.all !== 'function') return;
@@ -49,28 +60,35 @@ ExtensionsController.prototype._install = function (def) {
 
   const ext = {
     name: name,
-    //def:def.ext,
+    def: def.ext,
     brick: brick,
   };
+  // Contexts with prototype chaining to preserve access to brick/extension state
+  const ctxExt = Object.create(ext);
+  ctxExt.brick = brick;
+  ctxExt.ext = ext;
+  const ctxApi = Object.create(brick);
+  ctxApi.brick = brick;
+  ctxApi.ext = ext;
 
   // attach internal extension methods to ext (bound + wrapped)
+  const runtime = brick._controllers.runtime;
   if (def.ext.extension && typeof def.ext.extension === 'object') {
     for (const k in def.ext.extension) {
       if (!Object.prototype.hasOwnProperty.call(def.ext.extension, k)) continue;
       const fn = def.ext.extension[k];
       if (typeof fn === 'function') {
-        const boundFn = fn.bind(ext);
-        const runtime = brick._controllers.runtime;
-        if (runtime && typeof runtime.wrap === 'function') {
-          ext[k] = runtime.wrap(boundFn, ext, {
-            type: 'extension-private',
-            ext: name,
-            brick: brick.id,
-            fnName: k
-          });
-        } else {
-          ext[k] = boundFn;
+        if (isArrowFunction(fn)) {
+          console.warn('VanillaBrick: arrow functions discouraged for extension private method', { ns: name, fn: k, kind: brick.kind });
         }
+        const meta = { type: 'extension-private', ext: name, brick: brick.id, fnName: k };
+        ext[k] = function () {
+          const args = Array.prototype.slice.call(arguments);
+          if (runtime && typeof runtime.execute === 'function') {
+            return runtime.execute(fn, ctxExt, args, meta);
+          }
+          return fn.apply(ctxExt, args);
+        };
       }
     }
   }
@@ -95,21 +113,20 @@ ExtensionsController.prototype._install = function (def) {
         console.warn('VanillaBrick extension "' + name + '" api "' + apiName + '" is not a function');
         continue;
       }
+      if (isArrowFunction(apiFn)) {
+        console.warn('VanillaBrick: arrow functions discouraged for brick API', { ns: name, api: apiName, kind: brick.kind });
+      }
       if (nsObj[apiName]) {
         console.warn('VanillaBrick extension overwriting API ' + ns + '.' + apiName);
       }
-      const boundFn = apiFn.bind(brick);
-      const runtime = brick._controllers.runtime;
-      if (runtime && typeof runtime.wrap === 'function') {
-        nsObj[apiName] = runtime.wrap(boundFn, brick, {
-          type: 'brick-api',
-          ext: name,
-          brick: brick.id,
-          fnName: ns + '.' + apiName
-        });
-      } else {
-        nsObj[apiName] = boundFn;
-      }
+      const meta = { type: 'brick-api', ext: name, brick: brick.id, fnName: ns + '.' + apiName };
+      nsObj[apiName] = function () {
+        const args = Array.prototype.slice.call(arguments);
+        if (runtime && typeof runtime.execute === 'function') {
+          return runtime.execute(apiFn, ctxApi, args, meta);
+        }
+        return apiFn.apply(ctxApi, args);
+      };
     }
   }
 
@@ -150,24 +167,27 @@ ExtensionsController.prototype._install = function (def) {
       ['before', 'on', 'after'].forEach(function (phase) {
         const desc = evt[phase];
         if (!desc || typeof desc.fn !== 'function') return;
+        if (isArrowFunction(desc.fn)) {
+          console.warn('VanillaBrick: arrow functions discouraged for event handler', { ns: name, event: pattern, phase: phase, kind: brick.kind });
+        }
         const pr = (typeof desc.priority === 'number') ? desc.priority : undefined;
         const pattern = parsed.ns + ':' + parsed.action + ':' + parsed.target;
-        const boundFn = desc.fn.bind(ext);
-        const runtime = brick._controllers.runtime;
-        let wrapped;
-        if (runtime && typeof runtime.wrap === 'function') {
-          wrapped = runtime.wrap(boundFn, ext, {
-            type: 'event',
-            ext: name,
-            brick: brick.id,
-            event: pattern,
-            phase: phase,
-            fnName: desc.fn.name || 'anon'
-          });
-        } else {
-          wrapped = boundFn;
-        }
-        brick._controllers.events.on(pattern, phase, pr, wrapped, { ext: name, fn: desc.fn.name || 'anon' });
+        const meta = {
+          type: 'event',
+          ext: name,
+          brick: brick.id,
+          event: pattern,
+          phase: phase,
+          fnName: desc.fn.name || 'anon'
+        };
+        const handler = function (ev) {
+          const args = [ev];
+          if (runtime && typeof runtime.execute === 'function') {
+            return runtime.execute(desc.fn, ctxExt, args, meta);
+          }
+          return desc.fn.apply(ctxExt, args);
+        };
+        brick._controllers.events.on(pattern, phase, pr, handler, { ext: name, fn: desc.fn.name || 'anon', extInstance: ext });
       });
     }
   }
@@ -225,4 +245,3 @@ ExtensionsController.prototype._ensureDestroyHook = function () {
 };
 
 VanillaBrick.controllers.extensions = ExtensionsController;
-

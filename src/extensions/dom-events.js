@@ -17,6 +17,7 @@ VanillaBrick.extensions.domEvents = {
           if (!el || typeof el.addEventListener !== 'function') return;
           let listeners = this.brick.options.get("dom.events.listeners", []);
           if (!Array.isArray(listeners)) listeners = [];
+          const self = this;
           const defaultMap = [
             { type: 'click', eventName: 'dom:mouse:click' },
             { type: 'mouseenter', eventName: 'dom:hover:on' },
@@ -27,12 +28,12 @@ VanillaBrick.extensions.domEvents = {
 
           for (let i = 0; i < defaultMap.length; i += 1) {
             const entry = defaultMap[i];
-            const handler = function (domEvent) {
-              this.brick.events.fire(entry.eventName, {
+            const handler = function handler(domEvent) {
+              self.brick.events.fire(entry.eventName, {
                 domEvent: domEvent,
                 element: el,
               });
-            }.bind(this);
+            };
             el.addEventListener(entry.type, handler);
             listeners.push({ type: entry.type, handler: handler, source: 'default' });
           }

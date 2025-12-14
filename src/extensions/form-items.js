@@ -72,61 +72,63 @@ VanillaBrick.extensions.items = {
             // Always clear existing content when rendering from items list
             root.innerHTML = '';
 
-            items.forEach(item => {
-                if (item.type === 'group') {
-                    const groupEl = document.createElement('div');
-                    groupEl.className = 'vb-form-group';
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type !== 'group') continue;
 
-                    const rowEl = document.createElement('div');
-                    rowEl.className = 'vb-row';
+                const groupEl = document.createElement('div');
+                groupEl.className = 'vb-form-group';
 
-                    if (item.items && item.items.length) {
-                        item.items.forEach(field => {
-                            const span = field.span || 12;
-                            const colEl = document.createElement('div');
-                            colEl.className = 'vb-span-' + span;
+                const rowEl = document.createElement('div');
+                rowEl.className = 'vb-row';
 
-                            const fieldContainer = document.createElement('div');
-                            fieldContainer.className = 'vb-form-field';
+                if (item.items && item.items.length) {
+                    for (let j = 0; j < item.items.length; j++) {
+                        const field = item.items[j];
+                        const span = field.span || 12;
+                        const colEl = document.createElement('div');
+                        colEl.className = 'vb-span-' + span;
 
-                            if (field.label) {
-                                const label = document.createElement('label');
-                                label.textContent = field.label;
-                                if (field.name) label.htmlFor = field.name;
-                                fieldContainer.appendChild(label);
-                            }
+                        const fieldContainer = document.createElement('div');
+                        fieldContainer.className = 'vb-form-field';
 
-                            let input;
-                            if (field.controlType === 'textarea') {
-                                input = document.createElement('textarea');
-                            } else if (field.controlType === 'select') {
-                                input = document.createElement('select');
-                                // TODO: options
-                            } else {
-                                input = document.createElement('input');
-                                input.type = field.inputType || 'text';
-                            }
+                        if (field.label) {
+                            const label = document.createElement('label');
+                            label.textContent = field.label;
+                            if (field.name) label.htmlFor = field.name;
+                            fieldContainer.appendChild(label);
+                        }
 
-                            if (field.name) {
-                                input.name = field.name;
-                                input.id = field.name;
-                            }
-                            if (field.placeholder) input.placeholder = field.placeholder;
-                            // handle required gracefully
-                            if (field.required === true || field.required === 'true' || field.required === 'required') {
-                                input.required = true;
-                            }
+                        let input;
+                        if (field.controlType === 'textarea') {
+                            input = document.createElement('textarea');
+                        } else if (field.controlType === 'select') {
+                            input = document.createElement('select');
+                            // TODO: options
+                        } else {
+                            input = document.createElement('input');
+                            input.type = field.inputType || 'text';
+                        }
 
-                            fieldContainer.appendChild(input);
-                            colEl.appendChild(fieldContainer);
-                            rowEl.appendChild(colEl);
-                        });
+                        if (field.name) {
+                            input.name = field.name;
+                            input.id = field.name;
+                        }
+                        if (field.placeholder) input.placeholder = field.placeholder;
+                        // handle required gracefully
+                        if (field.required === true || field.required === 'true' || field.required === 'required') {
+                            input.required = true;
+                        }
+
+                        fieldContainer.appendChild(input);
+                        colEl.appendChild(fieldContainer);
+                        rowEl.appendChild(colEl);
                     }
-
-                    groupEl.appendChild(rowEl);
-                    root.appendChild(groupEl);
                 }
-            });
+
+                groupEl.appendChild(rowEl);
+                root.appendChild(groupEl);
+            }
 
             // Add Actions container if needed (can be separate config)
         }

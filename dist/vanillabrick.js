@@ -569,6 +569,17 @@ function ExtensionsController(brick) {
   this._destroyHook = false;
 }
 
+function isArrowFunction(fn) {
+  if (typeof fn !== 'function') return false;
+  // Arrow functions have no prototype and typically stringify with "=>"
+  if (fn.prototype) return false;
+  try {
+    return fn.toString().indexOf('=>') !== -1;
+  } catch (e) {
+    return false;
+  }
+}
+
 ExtensionsController.prototype.applyAll = function () {
   const registry = VanillaBrick.controllers.extensionsRegistry;
   if (!registry || typeof registry.all !== 'function') return;
@@ -602,28 +613,35 @@ ExtensionsController.prototype._install = function (def) {
 
   const ext = {
     name: name,
-    //def:def.ext,
+    def: def.ext,
     brick: brick,
   };
+  // Contexts with prototype chaining to preserve access to brick/extension state
+  const ctxExt = Object.create(ext);
+  ctxExt.brick = brick;
+  ctxExt.ext = ext;
+  const ctxApi = Object.create(brick);
+  ctxApi.brick = brick;
+  ctxApi.ext = ext;
 
   // attach internal extension methods to ext (bound + wrapped)
+  const runtime = brick._controllers.runtime;
   if (def.ext.extension && typeof def.ext.extension === 'object') {
     for (const k in def.ext.extension) {
       if (!Object.prototype.hasOwnProperty.call(def.ext.extension, k)) continue;
       const fn = def.ext.extension[k];
       if (typeof fn === 'function') {
-        const boundFn = fn.bind(ext);
-        const runtime = brick._controllers.runtime;
-        if (runtime && typeof runtime.wrap === 'function') {
-          ext[k] = runtime.wrap(boundFn, ext, {
-            type: 'extension-private',
-            ext: name,
-            brick: brick.id,
-            fnName: k
-          });
-        } else {
-          ext[k] = boundFn;
+        if (isArrowFunction(fn)) {
+          console.warn('VanillaBrick: arrow functions discouraged for extension private method', { ns: name, fn: k, kind: brick.kind });
         }
+        const meta = { type: 'extension-private', ext: name, brick: brick.id, fnName: k };
+        ext[k] = function () {
+          const args = Array.prototype.slice.call(arguments);
+          if (runtime && typeof runtime.execute === 'function') {
+            return runtime.execute(fn, ctxExt, args, meta);
+          }
+          return fn.apply(ctxExt, args);
+        };
       }
     }
   }
@@ -648,21 +666,20 @@ ExtensionsController.prototype._install = function (def) {
         console.warn('VanillaBrick extension "' + name + '" api "' + apiName + '" is not a function');
         continue;
       }
+      if (isArrowFunction(apiFn)) {
+        console.warn('VanillaBrick: arrow functions discouraged for brick API', { ns: name, api: apiName, kind: brick.kind });
+      }
       if (nsObj[apiName]) {
         console.warn('VanillaBrick extension overwriting API ' + ns + '.' + apiName);
       }
-      const boundFn = apiFn.bind(brick);
-      const runtime = brick._controllers.runtime;
-      if (runtime && typeof runtime.wrap === 'function') {
-        nsObj[apiName] = runtime.wrap(boundFn, brick, {
-          type: 'brick-api',
-          ext: name,
-          brick: brick.id,
-          fnName: ns + '.' + apiName
-        });
-      } else {
-        nsObj[apiName] = boundFn;
-      }
+      const meta = { type: 'brick-api', ext: name, brick: brick.id, fnName: ns + '.' + apiName };
+      nsObj[apiName] = function () {
+        const args = Array.prototype.slice.call(arguments);
+        if (runtime && typeof runtime.execute === 'function') {
+          return runtime.execute(apiFn, ctxApi, args, meta);
+        }
+        return apiFn.apply(ctxApi, args);
+      };
     }
   }
 
@@ -703,24 +720,27 @@ ExtensionsController.prototype._install = function (def) {
       ['before', 'on', 'after'].forEach(function (phase) {
         const desc = evt[phase];
         if (!desc || typeof desc.fn !== 'function') return;
+        if (isArrowFunction(desc.fn)) {
+          console.warn('VanillaBrick: arrow functions discouraged for event handler', { ns: name, event: pattern, phase: phase, kind: brick.kind });
+        }
         const pr = (typeof desc.priority === 'number') ? desc.priority : undefined;
         const pattern = parsed.ns + ':' + parsed.action + ':' + parsed.target;
-        const boundFn = desc.fn.bind(ext);
-        const runtime = brick._controllers.runtime;
-        let wrapped;
-        if (runtime && typeof runtime.wrap === 'function') {
-          wrapped = runtime.wrap(boundFn, ext, {
-            type: 'event',
-            ext: name,
-            brick: brick.id,
-            event: pattern,
-            phase: phase,
-            fnName: desc.fn.name || 'anon'
-          });
-        } else {
-          wrapped = boundFn;
-        }
-        brick._controllers.events.on(pattern, phase, pr, wrapped, { ext: name, fn: desc.fn.name || 'anon' });
+        const meta = {
+          type: 'event',
+          ext: name,
+          brick: brick.id,
+          event: pattern,
+          phase: phase,
+          fnName: desc.fn.name || 'anon'
+        };
+        const handler = function (ev) {
+          const args = [ev];
+          if (runtime && typeof runtime.execute === 'function') {
+            return runtime.execute(desc.fn, ctxExt, args, meta);
+          }
+          return desc.fn.apply(ctxExt, args);
+        };
+        brick._controllers.events.on(pattern, phase, pr, handler, { ext: name, fn: desc.fn.name || 'anon', extInstance: ext });
       });
     }
   }
@@ -778,7 +798,6 @@ ExtensionsController.prototype._ensureDestroyHook = function () {
 };
 
 VanillaBrick.controllers.extensions = ExtensionsController;
-
 
 // Diccionari de definicions d'extensions:
 //   VanillaBrick.extensions.myExt = { ns: "myExt", ... }
@@ -1278,6 +1297,7 @@ function RuntimeController(brick) {
  * @returns {*} The result of the function execution
  */
 RuntimeController.prototype.execute = function (fn, context, args, meta) {
+    "use strict";
     if (typeof fn !== 'function') {
         console.warn('[RuntimeController] Attempted to execute non-function', meta);
         return undefined;
@@ -1312,14 +1332,15 @@ RuntimeController.prototype.execute = function (fn, context, args, meta) {
  * @private
  */
 RuntimeController.prototype._handleError = function (err, fn, context, meta) {
+    var brickCtx = (context && context.brick) ? context.brick : context;
     const errorInfo = {
         error: err,
         message: err.message || String(err),
         stack: err.stack,
         meta: meta || {},
         context: {
-            brick: context && context.id ? context.id : null,
-            kind: context && context.kind ? context.kind : null
+            brick: brickCtx && brickCtx.id ? brickCtx.id : null,
+            kind: brickCtx && brickCtx.kind ? brickCtx.kind : null
         }
     };
 
@@ -1362,7 +1383,6 @@ RuntimeController.prototype.wrap = function (fn, context, meta) {
 // Expose constructor for per-brick instantiation
 VanillaBrick.controllers = VanillaBrick.controllers || {};
 VanillaBrick.controllers.runtime = RuntimeController;
-
 
 
 /**
@@ -1560,6 +1580,7 @@ VanillaBrick.extensions.domEvents = {
           if (!el || typeof el.addEventListener !== 'function') return;
           let listeners = this.brick.options.get("dom.events.listeners", []);
           if (!Array.isArray(listeners)) listeners = [];
+          const self = this;
           const defaultMap = [
             { type: 'click', eventName: 'dom:mouse:click' },
             { type: 'mouseenter', eventName: 'dom:hover:on' },
@@ -1570,12 +1591,12 @@ VanillaBrick.extensions.domEvents = {
 
           for (let i = 0; i < defaultMap.length; i += 1) {
             const entry = defaultMap[i];
-            const handler = function (domEvent) {
-              this.brick.events.fire(entry.eventName, {
+            const handler = function handler(domEvent) {
+              self.brick.events.fire(entry.eventName, {
                 domEvent: domEvent,
                 element: el,
               });
-            }.bind(this);
+            };
             el.addEventListener(entry.type, handler);
             listeners.push({ type: entry.type, handler: handler, source: 'default' });
           }
@@ -1774,61 +1795,63 @@ VanillaBrick.extensions.items = {
             // Always clear existing content when rendering from items list
             root.innerHTML = '';
 
-            items.forEach(item => {
-                if (item.type === 'group') {
-                    const groupEl = document.createElement('div');
-                    groupEl.className = 'vb-form-group';
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type !== 'group') continue;
 
-                    const rowEl = document.createElement('div');
-                    rowEl.className = 'vb-row';
+                const groupEl = document.createElement('div');
+                groupEl.className = 'vb-form-group';
 
-                    if (item.items && item.items.length) {
-                        item.items.forEach(field => {
-                            const span = field.span || 12;
-                            const colEl = document.createElement('div');
-                            colEl.className = 'vb-span-' + span;
+                const rowEl = document.createElement('div');
+                rowEl.className = 'vb-row';
 
-                            const fieldContainer = document.createElement('div');
-                            fieldContainer.className = 'vb-form-field';
+                if (item.items && item.items.length) {
+                    for (let j = 0; j < item.items.length; j++) {
+                        const field = item.items[j];
+                        const span = field.span || 12;
+                        const colEl = document.createElement('div');
+                        colEl.className = 'vb-span-' + span;
 
-                            if (field.label) {
-                                const label = document.createElement('label');
-                                label.textContent = field.label;
-                                if (field.name) label.htmlFor = field.name;
-                                fieldContainer.appendChild(label);
-                            }
+                        const fieldContainer = document.createElement('div');
+                        fieldContainer.className = 'vb-form-field';
 
-                            let input;
-                            if (field.controlType === 'textarea') {
-                                input = document.createElement('textarea');
-                            } else if (field.controlType === 'select') {
-                                input = document.createElement('select');
-                                // TODO: options
-                            } else {
-                                input = document.createElement('input');
-                                input.type = field.inputType || 'text';
-                            }
+                        if (field.label) {
+                            const label = document.createElement('label');
+                            label.textContent = field.label;
+                            if (field.name) label.htmlFor = field.name;
+                            fieldContainer.appendChild(label);
+                        }
 
-                            if (field.name) {
-                                input.name = field.name;
-                                input.id = field.name;
-                            }
-                            if (field.placeholder) input.placeholder = field.placeholder;
-                            // handle required gracefully
-                            if (field.required === true || field.required === 'true' || field.required === 'required') {
-                                input.required = true;
-                            }
+                        let input;
+                        if (field.controlType === 'textarea') {
+                            input = document.createElement('textarea');
+                        } else if (field.controlType === 'select') {
+                            input = document.createElement('select');
+                            // TODO: options
+                        } else {
+                            input = document.createElement('input');
+                            input.type = field.inputType || 'text';
+                        }
 
-                            fieldContainer.appendChild(input);
-                            colEl.appendChild(fieldContainer);
-                            rowEl.appendChild(colEl);
-                        });
+                        if (field.name) {
+                            input.name = field.name;
+                            input.id = field.name;
+                        }
+                        if (field.placeholder) input.placeholder = field.placeholder;
+                        // handle required gracefully
+                        if (field.required === true || field.required === 'true' || field.required === 'required') {
+                            input.required = true;
+                        }
+
+                        fieldContainer.appendChild(input);
+                        colEl.appendChild(fieldContainer);
+                        rowEl.appendChild(colEl);
                     }
-
-                    groupEl.appendChild(rowEl);
-                    root.appendChild(groupEl);
                 }
-            });
+
+                groupEl.appendChild(rowEl);
+                root.appendChild(groupEl);
+            }
 
             // Add Actions container if needed (can be separate config)
         }
@@ -2079,65 +2102,49 @@ VanillaBrick.extensions.rowsFocused = {
 
     brick: {},
 
-    extension: {},
+    extension: {
+        _addTabIndex: function () {
+            const el = this.brick.dom.element();
+            if (!el) return;
+            const rows = el.querySelectorAll('tbody tr') || [];
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row.hasAttribute('tabindex')) {
+                    row.setAttribute('tabindex', i);
+                }
+            }
+        },
+        _handleFocus: function (target) {
+            const el = this.brick.dom.element();
+            if (!el) return;
+            const row = target.closest('tr');
+            if (!row) return;
+            const old = el.querySelector('tr.vb-focused');
+            if (old) old.classList.remove('vb-focused');
+            row.classList.add('vb-focused');
+            const rowIndex = Array.prototype.indexOf.call(row.parentNode.children, row);
+            const data = this.brick.store.get(rowIndex);
+            this.brick.events.fire('dom:row:focus', {
+                index: rowIndex,
+                row: data,
+                element: row
+            });
+        }
+    },
 
     events: [
         {
             for: 'brick:status:ready',
             on: {
                 fn: function () {
-                    const brick = this.brick;
-                    const root = brick.dom.element();
-
-                    // Define logic locally to avoid context issues
-                    function addTabIndex() {
-                        const el = brick.dom.element();
-                        if (!el) return;
-                        const rows = el.querySelectorAll('tbody tr') || [];
-                        for (let i = 0; i < rows.length; i++) {
-                            const row = rows[i];
-                            if (!row.hasAttribute('tabindex')) {
-                                row.setAttribute('tabindex', '0');
-                            }
-                        }
-                    }
-
-                    function handleFocus(target) {
-                        const row = target.closest('tr');
-                        if (!row) return;
-
-                        const el = brick.dom.element();
-                        const old = el.querySelector('tr.vb-focused');
-                        if (old) old.classList.remove('vb-focused');
-                        row.classList.add('vb-focused');
-
-                        const rowIndex = Array.prototype.indexOf.call(row.parentNode.children, row);
-                        const data = brick.store.get(rowIndex);
-
-                        brick.events.fire('dom:row:focus', {
-                            index: rowIndex,
-                            row: data,
-                            element: row
+                    const el = this.brick.dom.element();
+                    if (el) {
+                        const self = this;
+                        el.addEventListener('focusin', function (e) {
+                            self._handleFocus(e.target);
                         });
                     }
-
-                    // Attach listener
-                    if (root) {
-                        root.addEventListener('focusin', function (e) {
-                            handleFocus(e.target);
-                        });
-                    }
-
-                    // Run initial
-                    addTabIndex();
-
-                    // Store reference for other handlers? 
-                    // We can't easily share with other events without `this`.
-                    // But other events just need addTabIndex.
-                    // Let's rely on the method existing on `this` for safely?
-                    // No, let's redefine addTabIndex in the other handlers or attach it to the brick instance temporarily? 
-                    // Actually, defining it on `this` manually is safe if WE do it.
-                    this._safeAddTabIndex = addTabIndex;
+                    this._addTabIndex();
                 }
             }
         },
@@ -2145,19 +2152,7 @@ VanillaBrick.extensions.rowsFocused = {
             for: 'store:data:set',
             after: {
                 fn: function () {
-                    // Use the safe reference we attached, or assume `this._safeAddTabIndex` works?
-                    // If `this` is consistent across events, it works.
-                    // If not, we re-implement. It's short.
-                    const brick = this.brick;
-                    const el = brick.dom.element();
-                    if (!el) return;
-                    const rows = el.querySelectorAll('tbody tr') || [];
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (!row.hasAttribute('tabindex')) {
-                            row.setAttribute('tabindex', i);
-                        }
-                    }
+                    this._addTabIndex();
                 }
             }
         },
@@ -2165,16 +2160,7 @@ VanillaBrick.extensions.rowsFocused = {
             for: 'store:data:sort',
             after: {
                 fn: function () {
-                    const brick = this.brick;
-                    const el = brick.dom.element();
-                    if (!el) return;
-                    const rows = el.querySelectorAll('tbody tr') || [];
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (!row.hasAttribute('tabindex')) {
-                            row.setAttribute('tabindex', i);
-                        }
-                    }
+                    this._addTabIndex();
                 }
             }
         }

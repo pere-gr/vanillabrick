@@ -24,6 +24,7 @@ function RuntimeController(brick) {
  * @returns {*} The result of the function execution
  */
 RuntimeController.prototype.execute = function (fn, context, args, meta) {
+    "use strict";
     if (typeof fn !== 'function') {
         console.warn('[RuntimeController] Attempted to execute non-function', meta);
         return undefined;
@@ -58,14 +59,15 @@ RuntimeController.prototype.execute = function (fn, context, args, meta) {
  * @private
  */
 RuntimeController.prototype._handleError = function (err, fn, context, meta) {
+    var brickCtx = (context && context.brick) ? context.brick : context;
     const errorInfo = {
         error: err,
         message: err.message || String(err),
         stack: err.stack,
         meta: meta || {},
         context: {
-            brick: context && context.id ? context.id : null,
-            kind: context && context.kind ? context.kind : null
+            brick: brickCtx && brickCtx.id ? brickCtx.id : null,
+            kind: brickCtx && brickCtx.kind ? brickCtx.kind : null
         }
     };
 
@@ -108,4 +110,3 @@ RuntimeController.prototype.wrap = function (fn, context, meta) {
 // Expose constructor for per-brick instantiation
 VanillaBrick.controllers = VanillaBrick.controllers || {};
 VanillaBrick.controllers.runtime = RuntimeController;
-

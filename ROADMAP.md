@@ -42,9 +42,10 @@ This document outlines the architectural improvements, performance optimizations
 - Executes code "bare metal" for maximum performance.
 - In `dev`, retains full stack traces and error handling.
 
-### 6. Memory Optimization ("Zero-Bind")
+### 6. Memory Optimization ("Zero-Bind") — ~~pending~~ implemented in core
 **Current State:** Extensions bind methods to specific instances (`.bind(brick)` or `.bind(ext)`), creating new function closures for every single brick.
-**Proposal:** Refactor the invocation strategy to avoid `.bind()`.
-- Use "Call Context" injection or hidden references (`this._brick`).
-- Allow thousands of bricks to share the exact same function generic in memory.
-- Reduces Heap footprint significantly for high-density UIs (e.g., spreadsheet cells as bricks).
+**Proposal:** ~~Refactor the invocation strategy to avoid `.bind()`.~~
+- ~~Use "Call Context" injection or hidden references (`this._brick`).~~
+- ~~Allow thousands of bricks to share the exact same function generic in memory.~~
+- ~~Reduces Heap footprint significantly for high-density UIs (e.g., spreadsheet cells as bricks).~~
+**Status:** Implemented in core (runtime + extensions controller) with shared context `{brick, ext}` and no `.bind()`.
