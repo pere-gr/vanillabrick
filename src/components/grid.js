@@ -1,5 +1,5 @@
-VanillaBrick.components.grid = {
-  for: ['grid'],
+VanillaBrick.extensions.grid = {
+  for: [{ host: 'brick', kind: 'grid' }],
   requires: ['dom'],
   ns: 'grid',
   options: {},

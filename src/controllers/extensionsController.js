@@ -39,6 +39,36 @@ ExtensionsController.prototype.applyAll = function () {
     return;
   }
 
+  // Phase 1: merge options before any init()
+  const optionsCtrl = this.brick._controllers && this.brick._controllers.options;
+  const utils = VanillaBrick.utils || {};
+  const mergeOptions = utils.mergeOptions;
+  if (!mergeOptions || typeof mergeOptions !== 'function') {
+    console.error('VanillaBrick.utils.mergeOptions is missing; cannot merge extension defaults safely');
+  } else if (optionsCtrl && typeof optionsCtrl.all === 'function') {
+    const userOptions = optionsCtrl.all();
+    const kind = (this.brick.kind || '').toLowerCase();
+    const coreDefaults = [];
+    const extDefaults = [];
+
+    for (let i = 0; i < defs.length; i += 1) {
+      const def = defs[i];
+      const defOpts = def.ext.options || def.ext._options;
+      if (!defOpts) continue;
+      const defName = (def.ext.ns || def.name || '').toLowerCase();
+      if (defName && kind && defName === kind + '-core') {
+        coreDefaults.push(defOpts);
+      } else {
+        extDefaults.push(defOpts);
+      }
+    }
+
+    const mergedOptions = mergeOptions.apply(null, coreDefaults.concat(extDefaults, [userOptions]));
+    optionsCtrl.data = mergedOptions;
+    optionsCtrl._cache = {};
+  }
+
+  // Phase 2: install + init extensions
   for (let i = 0; i < defs.length; i += 1) {
     this._install(defs[i]);
   }
@@ -93,16 +123,29 @@ ExtensionsController.prototype._install = function (def) {
     }
   }
 
-  // defaults options
-  const defOpts = def.ext.options || def.ext._options;
-  if (defOpts &&
-    brick._controllers &&
-    brick._controllers.options &&
-    typeof brick._controllers.options.setSilent === 'function') {
-    brick._controllers.options.setSilent(defOpts);
+  // init hook (this === ext, wrapped)
+  if (typeof def.ext.init === 'function') {
+    const runtime = brick._controllers.runtime;
+    try {
+      let res;
+      if (runtime && typeof runtime.execute === 'function') {
+        res = runtime.execute(def.ext.init, ext, [], {
+          type: 'init',
+          ext: name,
+          brick: brick.id,
+          fnName: 'init'
+        });
+      } else {
+        res = def.ext.init.call(ext);
+      }
+      if (res === false) return;
+    } catch (err) {
+      console.error('VanillaBrick extension "' + name + '" init() failed', err);
+      return;
+    }
   }
 
-  // expose API on brick namespace (wrapped)
+  // expose API on brick namespace (wrapped) only after successful init
   if (def.ext.brick && typeof def.ext.brick === 'object') {
     if (!brick[ns]) brick[ns] = {};
     const nsObj = brick[ns];
@@ -130,28 +173,6 @@ ExtensionsController.prototype._install = function (def) {
     }
   }
 
-  // init hook (this === ext, wrapped)
-  if (typeof def.ext.init === 'function') {
-    const runtime = brick._controllers.runtime;
-    try {
-      let res;
-      if (runtime && typeof runtime.execute === 'function') {
-        res = runtime.execute(def.ext.init, ext, [], {
-          type: 'init',
-          ext: name,
-          brick: brick.id,
-          fnName: 'init'
-        });
-      } else {
-        res = def.ext.init.call(ext);
-      }
-      if (res === false) return;
-    } catch (err) {
-      console.error('VanillaBrick extension "' + name + '" init() failed', err);
-      return;
-    }
-  }
-
   // register event listeners
   if (Array.isArray(def.ext.events) &&
     def.ext.events.length &&
@@ -163,6 +184,7 @@ ExtensionsController.prototype._install = function (def) {
       const evt = def.ext.events[li];
       if (!evt) continue;
       const parsed = parseForPattern(evt.for);
+      const pattern = parsed.ns + ':' + parsed.action + ':' + parsed.target;
 
       ['before', 'on', 'after'].forEach(function (phase) {
         const desc = evt[phase];

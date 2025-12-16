@@ -85,11 +85,290 @@ Object.defineProperty(Brick.prototype, '_nextId', {
 
 VanillaBrick.brick = Brick;
 
-VanillaBrick.components.form = {
-    for: ['form'],
+VanillaBrick.extensions.items = {
+    for: [{ host: 'brick', kind: 'form' }],
+    requires: ['dom'],
+    ns: 'items',
+    options: {},
+
+    brick: {
+        get: function () {
+            return this.options.get('form.items', []);
+        }
+    },
+
+    extension: {
+        _parseFromDom: function () {
+            const root = this.brick.dom.element();
+            if (!root) return [];
+
+            const items = [];
+            const groups = root.querySelectorAll('.vb-form-group');
+
+            for (let i = 0; i < groups.length; i++) {
+                const groupEl = groups[i];
+                const group = {
+                    type: 'group',
+                    items: []
+                };
+
+                // Check structure inside group
+                const fields = groupEl.querySelectorAll('.vb-form-field');
+                for (let j = 0; j < fields.length; j++) {
+                    const fieldEl = fields[j];
+                    const input = fieldEl.querySelector('input, select, textarea');
+                    const label = fieldEl.querySelector('label');
+
+                    if (input) {
+                        const fieldItem = {
+                            type: 'field',
+                            name: input.name || input.id,
+                            label: label ? label.textContent : '',
+                            controlType: input.tagName.toLowerCase(),
+                            inputType: input.type,
+                            required: input.required,
+                            placeholder: input.placeholder,
+                            // Detect span from parent column if exists
+                            span: this._detectSpan(fieldEl)
+                        };
+                        group.items.push(fieldItem);
+                    }
+                }
+                items.push(group);
+            }
+            return items;
+        },
+
+        _detectSpan: function (el) {
+            let current = el;
+            while (current && !current.classList.contains('vb-row')) {
+                if (current.className && typeof current.className === 'string') {
+                    const match = current.className.match(/vb-span-(\d+)/);
+                    if (match) return parseInt(match[1], 10);
+                }
+                current = current.parentElement;
+                if (!current || current.tagName === 'FORM') break;
+            }
+            return 12; // Default full width
+        },
+
+        _render: function (items) {
+            const root = this.brick.dom.element();
+            if (!root) return;
+
+            // Always clear existing content when rendering from items list
+            root.innerHTML = '';
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type !== 'group') continue;
+
+                const groupEl = document.createElement('div');
+                groupEl.className = 'vb-form-group';
+
+                const rowEl = document.createElement('div');
+                rowEl.className = 'vb-row';
+
+                if (item.items && item.items.length) {
+                    for (let j = 0; j < item.items.length; j++) {
+                        const field = item.items[j];
+                        const span = field.span || 12;
+                        const colEl = document.createElement('div');
+                        colEl.className = 'vb-span-' + span;
+
+                        const fieldContainer = document.createElement('div');
+                        fieldContainer.className = 'vb-form-field';
+
+                        if (field.label) {
+                            const label = document.createElement('label');
+                            label.textContent = field.label;
+                            if (field.name) label.htmlFor = field.name;
+                            fieldContainer.appendChild(label);
+                        }
+
+                        let input;
+                        if (field.controlType === 'textarea') {
+                            input = document.createElement('textarea');
+                        } else if (field.controlType === 'select') {
+                            input = document.createElement('select');
+                            // TODO: options
+                        } else {
+                            input = document.createElement('input');
+                            input.type = field.inputType || 'text';
+                        }
+
+                        if (field.name) {
+                            input.name = field.name;
+                            input.id = field.name;
+                        }
+                        if (field.placeholder) input.placeholder = field.placeholder;
+                        // handle required gracefully
+                        if (field.required === true || field.required === 'true' || field.required === 'required') {
+                            input.required = true;
+                        }
+
+                        fieldContainer.appendChild(input);
+                        colEl.appendChild(fieldContainer);
+                        rowEl.appendChild(colEl);
+                    }
+                }
+
+                groupEl.appendChild(rowEl);
+                root.appendChild(groupEl);
+            }
+
+            // Add Actions container if needed (can be separate config)
+        }
+    },
+
+    events: [
+        {
+            for: 'brick:status:ready',
+            before: {
+                fn: function (ev) {
+                    // Start fresh
+                    let items = [];
+                    // Check options first (programmatic)
+                    if (this.brick.options.has('form.items')) {
+                        items = this.brick.options.get('form.items');
+                    }
+
+                    if (!items || items.length === 0) {
+                        // Try to parse from global variable defined in attribute
+                        const root = this.brick.dom.element();
+                        if (root) {
+                            const configVar = root.getAttribute('brick-form-items') || root.getAttribute('data-form-items');
+                            if (configVar && window[configVar]) {
+                                console.log('[Form Items] Config var found', configVar);
+                                items = window[configVar];
+                                this.brick.options.set('form.items', items);
+                            }
+                        }
+
+                        // if still no items, check if current DOM has any specific structure to parse
+                        // (only if we didn't just load them from var)
+                        if (!items || items.length === 0) {
+                            // Try to parse from DOM
+                            console.log('[Form Items] Parsing from DOM', this.brick.id);
+                            items = this._parseFromDom();
+                            this.brick.options.set('form.items', items);
+                        }
+                    } else {
+                        console.log('[Form Items] Config found in options', items);
+                    }
+
+                    // Helper to access data in on phase
+                    ev.data = ev.data || {};
+                    ev.data.formItems = items;
+                }
+            },
+            on: {
+                fn: function (ev) {
+                    const items = ev.data.formItems || this.brick.options.get('form.items');
+
+                    if (items && items.length > 0) {
+                        // We render if there are items. 
+                        // Note: If we just parsed them from DOM, this will clear and re-render the same structure.
+                        // Ideally we check if we need to render.
+                        // But per requirements: "Si li pasem un arbre d'items... tant és el que hi hagi en el html/DOM. Ha d'haver-hi aquells. Si cal netejar el DOM i afegir els nous... es fa."
+
+                        // Optimization: if we just parsed it, re-rendering is redundant but safe. 
+                        // To avoid infinite loop or weirdness, we could check a flag, but strict rendering ensures state == DOM.
+                        this._render(items);
+                    }
+                }
+            }
+        }
+    ],
+
+    init: function () {
+        return true;
+    },
+
+    destroy: function () {
+    }
+};
+
+VanillaBrick.extensions.record = {
+    for: [{ host: 'brick', kind: 'form' }],
+    requires: ['dom', 'store'],
+    ns: 'record',
+    options: {},
+
+    brick: {
+        // We could expose methods to get/set the current record directly if needed
+        getRecord: function () {
+            const data = this.store.load();
+            return (data && data.length) ? data[0] : null;
+        }
+    },
+
+    extension: {
+        _bind: function (record) {
+            const root = this.brick.dom.element();
+            if (!root) return;
+
+            // Iterate over all form fields
+            const inputs = root.querySelectorAll('input, select, textarea');
+            for (let i = 0; i < inputs.length; i++) {
+                const input = inputs[i];
+                const name = input.name || input.id;
+                if (!name) continue;
+
+                // If record has this field, set value
+                if (record && Object.prototype.hasOwnProperty.call(record, name)) {
+                    input.value = record[name];
+                } else {
+                    // Optional: clear if not in record? Or leave defaults?
+                    // Typically binding means reflecting state. If state is null, clear.
+                    // But if record doesn't have the key, maybe leave it?
+                    // Let's assume strict binding for now: if record is null, clear.
+                    if (!record) input.value = '';
+                }
+            }
+        }
+    },
+
+    events: [
+        {
+            for: 'brick:status:ready',
+            on: {
+                fn: function (ev) {
+                    const data = this.brick.store.load();
+                    if (data && data.length) {
+                        this._bind(data[0]);
+                    }
+                }
+            }
+        },
+        {
+            for: 'store:data:*',
+            after: {
+                fn: function (ev) {
+                    const data = this.brick.store.load();
+                    // We bind the first record
+                    const record = (data && data.length) ? data[0] : null;
+                    this._bind(record);
+                }
+            }
+        }
+    ],
+
+    init: function () {
+        return true;
+    },
+
+    destroy: function () {
+    }
+};
+
+VanillaBrick.extensions.form = {
+    for: [{ host: 'brick', kind: 'form' }],
     requires: ['dom'],
     ns: 'form',
-    options: {},
+    options: {
+        items:[],
+    },
 
     brick: {
         // Basic form component methods can be added here
@@ -128,8 +407,251 @@ VanillaBrick.components.form = {
     }
 };
 
-VanillaBrick.components.grid = {
-  for: ['grid'],
+VanillaBrick.extensions.columns = {
+  for: [{ host: 'brick', kind: 'grid' }],
+  requires: ['dom', 'store'],
+  ns: 'columns',
+  options: {},
+
+  brick: {
+    get: function () {
+      return this.options.get("grid.columns", []);
+    },
+    sort: function (field, dir) {
+      const cols = this.columns.get();
+      const colDef = cols.find(function (c) { return c && c.datafield === field; }) || {};
+      const state = this.options.get("grid.sort", { field: null, dir: null });
+      let nextDir = dir;
+      if (nextDir !== 'asc' && nextDir !== 'desc') {
+        nextDir = (state.field === field && state.dir === 'asc') ? 'desc' : 'asc';
+      }
+
+      this.events.fire('store:data:sort', {
+        field: field,
+        dir: nextDir,
+        compare: typeof colDef.sort === 'function' ? colDef.sort : null
+      });
+
+      return nextDir;
+    }
+  },
+
+  extension: {},
+
+  events: [
+    {
+      for: 'brick:status:ready',
+      on: {
+        fn: function () {
+          const columns = this.brick.columns.get();
+          const root = this.brick.dom.element && this.brick.dom.element();
+          if (!root) return;
+
+          const table = root.tagName && root.tagName.toLowerCase() === 'table'
+            ? root
+            : root.querySelector && root.querySelector('table');
+          if (!table) return;
+
+          let thead = (table.tHead) ? table.tHead : table.querySelector('thead');
+          if (!thead) {
+            thead = table.createTHead ? table.createTHead() : table.insertBefore(document.createElement('thead'), table.firstChild);
+          }
+
+          const row = thead.rows && thead.rows[0] ? thead.rows[0] : thead.insertRow();
+          row.innerHTML = '';
+          const brick = this.brick;
+          for (let i = 0; i < columns.length; i += 1) {
+            const col = columns[i] || {};
+            const th = document.createElement('th');
+            th.textContent = col.label || col.datafield || '';
+            if (col.sortable && col.datafield) {
+              th.classList.add('vb-sortable');
+              th.addEventListener('click', (function (colDef) {
+                return function () {
+                  brick.columns.sort(colDef.datafield, null);
+                };
+              })(col));
+            }
+            row.appendChild(th);
+          }
+        }
+      }
+    },
+    {
+      for: 'store:data:sort',
+      after: {
+        fn: function (ev) {
+          this.brick.options.setSilent("grid.sort", { field: ev.field, dir: ev.dir || 'asc' });
+        }
+      }
+    }
+  ],
+
+  init: function () { },
+
+  destroy: function () { },
+
+  options: {
+    grid: {
+      columns: [
+        { datafield: 'code', label: 'Code', sortable: true },
+        { datafield: 'name', label: 'Name', sortable: true },
+      ]
+    }
+  }
+};
+
+
+VanillaBrick.extensions.rowsFocused = {
+  for: [{ host: 'brick', kind: 'grid' }],
+    requires: ['dom', 'rows', 'store'],
+    ns: 'rowsFocused',
+    options: {},
+
+    brick: {},
+
+    extension: {
+        _addTabIndex: function () {
+            const el = this.brick.dom.element();
+            if (!el) return;
+            const rows = el.querySelectorAll('tbody tr') || [];
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row.hasAttribute('tabindex')) {
+                    row.setAttribute('tabindex', i);
+                }
+            }
+        },
+        _handleFocus: function (target) {
+            const el = this.brick.dom.element();
+            if (!el) return;
+            const row = target.closest('tr');
+            if (!row) return;
+            const old = el.querySelector('tr.vb-focused');
+            if (old) old.classList.remove('vb-focused');
+            row.classList.add('vb-focused');
+            const rowIndex = Array.prototype.indexOf.call(row.parentNode.children, row);
+            const data = this.brick.store.get(rowIndex);
+            this.brick.events.fire('dom:row:focus', {
+                index: rowIndex,
+                row: data,
+                element: row
+            });
+        }
+    },
+
+    events: [
+        {
+            for: 'brick:status:ready',
+            on: {
+                fn: function () {
+                    const el = this.brick.dom.element();
+                    if (el) {
+                        const self = this;
+                        el.addEventListener('focusin', function (e) {
+                            self._handleFocus(e.target);
+                        });
+                    }
+                    this._addTabIndex();
+                }
+            }
+        },
+        {
+            for: 'store:data:set',
+            after: {
+                fn: function () {
+                    this._addTabIndex();
+                }
+            }
+        },
+        {
+            for: 'store:data:sort',
+            after: {
+                fn: function () {
+                    this._addTabIndex();
+                }
+            }
+        }
+    ],
+
+    init: function () { },
+
+    destroy: function () { }
+};
+
+VanillaBrick.extensions.rows = {
+  for: [{ host: 'brick', kind: 'grid' }],
+  requires: ['dom', 'store', 'columns'],
+  ns: 'rows',
+  options: {},
+
+  brick: {
+    render: function () {
+      const root = this.dom.element();
+      if (!root) return;
+
+      const table = root.tagName && root.tagName.toLowerCase() === 'table'
+        ? root
+        : root.querySelector && root.querySelector('table');
+      if (!table) return;
+
+      const columns = this.columns.get();
+      const rows = this.store.load();
+
+      let tbody = (table.tBodies && table.tBodies.length)
+        ? table.tBodies[0]
+        : table.querySelector('tbody');
+      if (!tbody) {
+        tbody = document.createElement('tbody');
+        table.appendChild(tbody);
+      }
+      tbody.innerHTML = '';
+
+      for (let r = 0; r < rows.length; r += 1) {
+        const record = rows[r] || {};
+        const tr = document.createElement('tr');
+        for (let c = 0; c < columns.length; c += 1) {
+          const col = columns[c] || {};
+          const field = col.datafield;
+          const td = document.createElement('td');
+          td.textContent = (field && record[field] !== undefined && record[field] !== null)
+            ? record[field]
+            : '';
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+    }
+  },
+
+  extension: {},
+
+  events: [
+    {
+      for: 'brick:status:ready',
+      on: {
+        fn: function () {
+          this.brick.rows.render();
+        }
+      }
+    },
+    {
+      for: 'store:data:*',
+      after: {
+        fn: function (ev) {
+          this.brick.rows.render();
+        }
+      }
+    }
+  ],
+
+  init: function () { },
+
+  destroy: function () { }
+};
+
+VanillaBrick.extensions.grid = {
+  for: [{ host: 'brick', kind: 'grid' }],
   requires: ['dom'],
   ns: 'grid',
   options: {},
@@ -599,6 +1121,36 @@ ExtensionsController.prototype.applyAll = function () {
     return;
   }
 
+  // Phase 1: merge options before any init()
+  const optionsCtrl = this.brick._controllers && this.brick._controllers.options;
+  const utils = VanillaBrick.utils || {};
+  const mergeOptions = utils.mergeOptions;
+  if (!mergeOptions || typeof mergeOptions !== 'function') {
+    console.error('VanillaBrick.utils.mergeOptions is missing; cannot merge extension defaults safely');
+  } else if (optionsCtrl && typeof optionsCtrl.all === 'function') {
+    const userOptions = optionsCtrl.all();
+    const kind = (this.brick.kind || '').toLowerCase();
+    const coreDefaults = [];
+    const extDefaults = [];
+
+    for (let i = 0; i < defs.length; i += 1) {
+      const def = defs[i];
+      const defOpts = def.ext.options || def.ext._options;
+      if (!defOpts) continue;
+      const defName = (def.ext.ns || def.name || '').toLowerCase();
+      if (defName && kind && defName === kind + '-core') {
+        coreDefaults.push(defOpts);
+      } else {
+        extDefaults.push(defOpts);
+      }
+    }
+
+    const mergedOptions = mergeOptions.apply(null, coreDefaults.concat(extDefaults, [userOptions]));
+    optionsCtrl.data = mergedOptions;
+    optionsCtrl._cache = {};
+  }
+
+  // Phase 2: install + init extensions
   for (let i = 0; i < defs.length; i += 1) {
     this._install(defs[i]);
   }
@@ -653,16 +1205,29 @@ ExtensionsController.prototype._install = function (def) {
     }
   }
 
-  // defaults options
-  const defOpts = def.ext.options || def.ext._options;
-  if (defOpts &&
-    brick._controllers &&
-    brick._controllers.options &&
-    typeof brick._controllers.options.setSilent === 'function') {
-    brick._controllers.options.setSilent(defOpts);
+  // init hook (this === ext, wrapped)
+  if (typeof def.ext.init === 'function') {
+    const runtime = brick._controllers.runtime;
+    try {
+      let res;
+      if (runtime && typeof runtime.execute === 'function') {
+        res = runtime.execute(def.ext.init, ext, [], {
+          type: 'init',
+          ext: name,
+          brick: brick.id,
+          fnName: 'init'
+        });
+      } else {
+        res = def.ext.init.call(ext);
+      }
+      if (res === false) return;
+    } catch (err) {
+      console.error('VanillaBrick extension "' + name + '" init() failed', err);
+      return;
+    }
   }
 
-  // expose API on brick namespace (wrapped)
+  // expose API on brick namespace (wrapped) only after successful init
   if (def.ext.brick && typeof def.ext.brick === 'object') {
     if (!brick[ns]) brick[ns] = {};
     const nsObj = brick[ns];
@@ -690,28 +1255,6 @@ ExtensionsController.prototype._install = function (def) {
     }
   }
 
-  // init hook (this === ext, wrapped)
-  if (typeof def.ext.init === 'function') {
-    const runtime = brick._controllers.runtime;
-    try {
-      let res;
-      if (runtime && typeof runtime.execute === 'function') {
-        res = runtime.execute(def.ext.init, ext, [], {
-          type: 'init',
-          ext: name,
-          brick: brick.id,
-          fnName: 'init'
-        });
-      } else {
-        res = def.ext.init.call(ext);
-      }
-      if (res === false) return;
-    } catch (err) {
-      console.error('VanillaBrick extension "' + name + '" init() failed', err);
-      return;
-    }
-  }
-
   // register event listeners
   if (Array.isArray(def.ext.events) &&
     def.ext.events.length &&
@@ -723,6 +1266,7 @@ ExtensionsController.prototype._install = function (def) {
       const evt = def.ext.events[li];
       if (!evt) continue;
       const parsed = parseForPattern(evt.for);
+      const pattern = parsed.ns + ':' + parsed.action + ':' + parsed.target;
 
       ['before', 'on', 'after'].forEach(function (phase) {
         const desc = evt[phase];
@@ -1743,526 +2287,6 @@ VanillaBrick.extensions.dom = {
   }
 };
 
-VanillaBrick.extensions.items = {
-    for: [{ host: 'brick', kind: 'form' }],
-    requires: ['dom'],
-    ns: 'items',
-    options: {},
-
-    brick: {
-        get: function () {
-            return this.options.get('form.items', []);
-        }
-    },
-
-    extension: {
-        _parseFromDom: function () {
-            const root = this.brick.dom.element();
-            if (!root) return [];
-
-            const items = [];
-            const groups = root.querySelectorAll('.vb-form-group');
-
-            for (let i = 0; i < groups.length; i++) {
-                const groupEl = groups[i];
-                const group = {
-                    type: 'group',
-                    items: []
-                };
-
-                // Check structure inside group
-                const fields = groupEl.querySelectorAll('.vb-form-field');
-                for (let j = 0; j < fields.length; j++) {
-                    const fieldEl = fields[j];
-                    const input = fieldEl.querySelector('input, select, textarea');
-                    const label = fieldEl.querySelector('label');
-
-                    if (input) {
-                        const fieldItem = {
-                            type: 'field',
-                            name: input.name || input.id,
-                            label: label ? label.textContent : '',
-                            controlType: input.tagName.toLowerCase(),
-                            inputType: input.type,
-                            required: input.required,
-                            placeholder: input.placeholder,
-                            // Detect span from parent column if exists
-                            span: this._detectSpan(fieldEl)
-                        };
-                        group.items.push(fieldItem);
-                    }
-                }
-                items.push(group);
-            }
-            return items;
-        },
-
-        _detectSpan: function (el) {
-            let current = el;
-            while (current && !current.classList.contains('vb-row')) {
-                if (current.className && typeof current.className === 'string') {
-                    const match = current.className.match(/vb-span-(\d+)/);
-                    if (match) return parseInt(match[1], 10);
-                }
-                current = current.parentElement;
-                if (!current || current.tagName === 'FORM') break;
-            }
-            return 12; // Default full width
-        },
-
-        _render: function (items) {
-            const root = this.brick.dom.element();
-            if (!root) return;
-
-            // Always clear existing content when rendering from items list
-            root.innerHTML = '';
-
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                if (item.type !== 'group') continue;
-
-                const groupEl = document.createElement('div');
-                groupEl.className = 'vb-form-group';
-
-                const rowEl = document.createElement('div');
-                rowEl.className = 'vb-row';
-
-                if (item.items && item.items.length) {
-                    for (let j = 0; j < item.items.length; j++) {
-                        const field = item.items[j];
-                        const span = field.span || 12;
-                        const colEl = document.createElement('div');
-                        colEl.className = 'vb-span-' + span;
-
-                        const fieldContainer = document.createElement('div');
-                        fieldContainer.className = 'vb-form-field';
-
-                        if (field.label) {
-                            const label = document.createElement('label');
-                            label.textContent = field.label;
-                            if (field.name) label.htmlFor = field.name;
-                            fieldContainer.appendChild(label);
-                        }
-
-                        let input;
-                        if (field.controlType === 'textarea') {
-                            input = document.createElement('textarea');
-                        } else if (field.controlType === 'select') {
-                            input = document.createElement('select');
-                            // TODO: options
-                        } else {
-                            input = document.createElement('input');
-                            input.type = field.inputType || 'text';
-                        }
-
-                        if (field.name) {
-                            input.name = field.name;
-                            input.id = field.name;
-                        }
-                        if (field.placeholder) input.placeholder = field.placeholder;
-                        // handle required gracefully
-                        if (field.required === true || field.required === 'true' || field.required === 'required') {
-                            input.required = true;
-                        }
-
-                        fieldContainer.appendChild(input);
-                        colEl.appendChild(fieldContainer);
-                        rowEl.appendChild(colEl);
-                    }
-                }
-
-                groupEl.appendChild(rowEl);
-                root.appendChild(groupEl);
-            }
-
-            // Add Actions container if needed (can be separate config)
-        }
-    },
-
-    events: [
-        {
-            for: 'brick:status:ready',
-            before: {
-                fn: function (ev) {
-                    // Start fresh
-                    let items = [];
-                    // Check options first (programmatic)
-                    if (this.brick.options.has('form.items')) {
-                        items = this.brick.options.get('form.items');
-                    }
-
-                    if (!items || items.length === 0) {
-                        // Try to parse from global variable defined in attribute
-                        const root = this.brick.dom.element();
-                        if (root) {
-                            const configVar = root.getAttribute('brick-form-items') || root.getAttribute('data-form-items');
-                            if (configVar && window[configVar]) {
-                                console.log('[Form Items] Config var found', configVar);
-                                items = window[configVar];
-                                this.brick.options.set('form.items', items);
-                            }
-                        }
-
-                        // if still no items, check if current DOM has any specific structure to parse
-                        // (only if we didn't just load them from var)
-                        if (!items || items.length === 0) {
-                            // Try to parse from DOM
-                            console.log('[Form Items] Parsing from DOM', this.brick.id);
-                            items = this._parseFromDom();
-                            this.brick.options.set('form.items', items);
-                        }
-                    } else {
-                        console.log('[Form Items] Config found in options', items);
-                    }
-
-                    // Helper to access data in on phase
-                    ev.data = ev.data || {};
-                    ev.data.formItems = items;
-                }
-            },
-            on: {
-                fn: function (ev) {
-                    const items = ev.data.formItems || this.brick.options.get('form.items');
-
-                    if (items && items.length > 0) {
-                        // We render if there are items. 
-                        // Note: If we just parsed them from DOM, this will clear and re-render the same structure.
-                        // Ideally we check if we need to render.
-                        // But per requirements: "Si li pasem un arbre d'items... tant és el que hi hagi en el html/DOM. Ha d'haver-hi aquells. Si cal netejar el DOM i afegir els nous... es fa."
-
-                        // Optimization: if we just parsed it, re-rendering is redundant but safe. 
-                        // To avoid infinite loop or weirdness, we could check a flag, but strict rendering ensures state == DOM.
-                        this._render(items);
-                    }
-                }
-            }
-        }
-    ],
-
-    init: function () {
-        return true;
-    },
-
-    destroy: function () {
-    }
-};
-
-VanillaBrick.extensions.record = {
-    for: [{ host: 'brick', kind: 'form' }],
-    requires: ['dom', 'store'],
-    ns: 'record',
-    options: {},
-
-    brick: {
-        // We could expose methods to get/set the current record directly if needed
-        getRecord: function () {
-            const data = this.store.load();
-            return (data && data.length) ? data[0] : null;
-        }
-    },
-
-    extension: {
-        _bind: function (record) {
-            const root = this.brick.dom.element();
-            if (!root) return;
-
-            // Iterate over all form fields
-            const inputs = root.querySelectorAll('input, select, textarea');
-            for (let i = 0; i < inputs.length; i++) {
-                const input = inputs[i];
-                const name = input.name || input.id;
-                if (!name) continue;
-
-                // If record has this field, set value
-                if (record && Object.prototype.hasOwnProperty.call(record, name)) {
-                    input.value = record[name];
-                } else {
-                    // Optional: clear if not in record? Or leave defaults?
-                    // Typically binding means reflecting state. If state is null, clear.
-                    // But if record doesn't have the key, maybe leave it?
-                    // Let's assume strict binding for now: if record is null, clear.
-                    if (!record) input.value = '';
-                }
-            }
-        }
-    },
-
-    events: [
-        {
-            for: 'brick:status:ready',
-            on: {
-                fn: function (ev) {
-                    const data = this.brick.store.load();
-                    if (data && data.length) {
-                        this._bind(data[0]);
-                    }
-                }
-            }
-        },
-        {
-            for: 'store:data:*',
-            after: {
-                fn: function (ev) {
-                    const data = this.brick.store.load();
-                    // We bind the first record
-                    const record = (data && data.length) ? data[0] : null;
-                    this._bind(record);
-                }
-            }
-        }
-    ],
-
-    init: function () {
-        return true;
-    },
-
-    destroy: function () {
-    }
-};
-
-VanillaBrick.extensions.columns = {
-  for: [{ host: 'brick', kind: 'grid' }],
-  requires: ['dom', 'store'],
-  ns: 'columns',
-  options: {},
-
-  brick: {
-    get: function () {
-      return this.options.get("grid.columns", []);
-    },
-    sort: function (field, dir) {
-      const cols = this.columns.get();
-      const colDef = cols.find(function (c) { return c && c.datafield === field; }) || {};
-      const state = this.options.get("grid.sort", { field: null, dir: null });
-      let nextDir = dir;
-      if (nextDir !== 'asc' && nextDir !== 'desc') {
-        nextDir = (state.field === field && state.dir === 'asc') ? 'desc' : 'asc';
-      }
-
-      this.events.fire('store:data:sort', {
-        field: field,
-        dir: nextDir,
-        compare: typeof colDef.sort === 'function' ? colDef.sort : null
-      });
-
-      return nextDir;
-    }
-  },
-
-  extension: {},
-
-  events: [
-    {
-      for: 'brick:status:ready',
-      on: {
-        fn: function () {
-          const columns = this.brick.columns.get();
-          const root = this.brick.dom.element && this.brick.dom.element();
-          if (!root) return;
-
-          const table = root.tagName && root.tagName.toLowerCase() === 'table'
-            ? root
-            : root.querySelector && root.querySelector('table');
-          if (!table) return;
-
-          let thead = (table.tHead) ? table.tHead : table.querySelector('thead');
-          if (!thead) {
-            thead = table.createTHead ? table.createTHead() : table.insertBefore(document.createElement('thead'), table.firstChild);
-          }
-
-          const row = thead.rows && thead.rows[0] ? thead.rows[0] : thead.insertRow();
-          row.innerHTML = '';
-          const brick = this.brick;
-          for (let i = 0; i < columns.length; i += 1) {
-            const col = columns[i] || {};
-            const th = document.createElement('th');
-            th.textContent = col.label || col.datafield || '';
-            if (col.sortable && col.datafield) {
-              th.classList.add('vb-sortable');
-              th.addEventListener('click', (function (colDef) {
-                return function () {
-                  brick.columns.sort(colDef.datafield, null);
-                };
-              })(col));
-            }
-            row.appendChild(th);
-          }
-        }
-      }
-    },
-    {
-      for: 'store:data:sort',
-      after: {
-        fn: function (ev) {
-          this.brick.options.setSilent("grid.sort", { field: ev.field, dir: ev.dir || 'asc' });
-        }
-      }
-    }
-  ],
-
-  init: function () { },
-
-  destroy: function () { },
-
-  options: {
-    grid: {
-      columns: [
-        { datafield: 'code', label: 'Code', sortable: true },
-        { datafield: 'name', label: 'Name', sortable: true },
-      ]
-    }
-  }
-};
-
-
-VanillaBrick.extensions.rowsFocused = {
-  for: [{ host: 'brick', kind: 'grid' }],
-    requires: ['dom', 'rows', 'store'],
-    ns: 'rowsFocused',
-    options: {},
-
-    brick: {},
-
-    extension: {
-        _addTabIndex: function () {
-            const el = this.brick.dom.element();
-            if (!el) return;
-            const rows = el.querySelectorAll('tbody tr') || [];
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                if (!row.hasAttribute('tabindex')) {
-                    row.setAttribute('tabindex', i);
-                }
-            }
-        },
-        _handleFocus: function (target) {
-            const el = this.brick.dom.element();
-            if (!el) return;
-            const row = target.closest('tr');
-            if (!row) return;
-            const old = el.querySelector('tr.vb-focused');
-            if (old) old.classList.remove('vb-focused');
-            row.classList.add('vb-focused');
-            const rowIndex = Array.prototype.indexOf.call(row.parentNode.children, row);
-            const data = this.brick.store.get(rowIndex);
-            this.brick.events.fire('dom:row:focus', {
-                index: rowIndex,
-                row: data,
-                element: row
-            });
-        }
-    },
-
-    events: [
-        {
-            for: 'brick:status:ready',
-            on: {
-                fn: function () {
-                    const el = this.brick.dom.element();
-                    if (el) {
-                        const self = this;
-                        el.addEventListener('focusin', function (e) {
-                            self._handleFocus(e.target);
-                        });
-                    }
-                    this._addTabIndex();
-                }
-            }
-        },
-        {
-            for: 'store:data:set',
-            after: {
-                fn: function () {
-                    this._addTabIndex();
-                }
-            }
-        },
-        {
-            for: 'store:data:sort',
-            after: {
-                fn: function () {
-                    this._addTabIndex();
-                }
-            }
-        }
-    ],
-
-    init: function () { },
-
-    destroy: function () { }
-};
-
-VanillaBrick.extensions.rows = {
-  for: [{ host: 'brick', kind: 'grid' }],
-  requires: ['dom', 'store', 'columns'],
-  ns: 'rows',
-  options: {},
-
-  brick: {
-    render: function () {
-      const root = this.dom.element();
-      if (!root) return;
-
-      const table = root.tagName && root.tagName.toLowerCase() === 'table'
-        ? root
-        : root.querySelector && root.querySelector('table');
-      if (!table) return;
-
-      const columns = this.columns.get();
-      const rows = this.store.load();
-
-      let tbody = (table.tBodies && table.tBodies.length)
-        ? table.tBodies[0]
-        : table.querySelector('tbody');
-      if (!tbody) {
-        tbody = document.createElement('tbody');
-        table.appendChild(tbody);
-      }
-      tbody.innerHTML = '';
-
-      for (let r = 0; r < rows.length; r += 1) {
-        const record = rows[r] || {};
-        const tr = document.createElement('tr');
-        for (let c = 0; c < columns.length; c += 1) {
-          const col = columns[c] || {};
-          const field = col.datafield;
-          const td = document.createElement('td');
-          td.textContent = (field && record[field] !== undefined && record[field] !== null)
-            ? record[field]
-            : '';
-          tr.appendChild(td);
-        }
-        tbody.appendChild(tr);
-      }
-    }
-  },
-
-  extension: {},
-
-  events: [
-    {
-      for: 'brick:status:ready',
-      on: {
-        fn: function () {
-          this.brick.rows.render();
-        }
-      }
-    },
-    {
-      for: 'store:data:*',
-      after: {
-        fn: function (ev) {
-          this.brick.rows.render();
-        }
-      }
-    }
-  ],
-
-  init: function () { },
-
-  destroy: function () { }
-};
-
 const DATA_SAMPLE_ROWS = [
   { code: '1', name: 'one', key: 1 },
   { code: '2', name: 'two', key: 2 },
@@ -2721,6 +2745,120 @@ VanillaBrick.base.serviceStop = function (name) {
 
     delete VanillaBrick.runtime.services[name];
 };
+
+// Utilities for safe deep cloning and merging of options objects.
+// Exposed under VanillaBrick.utils.*
+
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function isPollutionKey(key) {
+  return key === '__proto__' || key === 'prototype' || key === 'constructor';
+}
+
+function assertSafeValue(value, path) {
+  if (
+    value === null ||
+    typeof value === 'undefined' ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return { ok: true };
+  }
+  if (Array.isArray(value)) return { ok: true };
+  if (isPlainObject(value)) return { ok: true };
+
+  const msg = 'VanillaBrick options only support primitives, plain objects, and arrays. Invalid at "' + path + '"';
+  console.error(msg, value);
+  return { ok: false };
+}
+
+function deepCloneOptions(value, path) {
+  const currentPath = path || '';
+  const valid = assertSafeValue(value, currentPath || '<root>');
+  if (!valid.ok) {
+    // unsupported value: keep reference
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const arr = new Array(value.length);
+    for (let i = 0; i < value.length; i += 1) {
+      arr[i] = deepCloneOptions(value[i], currentPath ? currentPath + '[' + i + ']' : '[' + i + ']');
+    }
+    return arr;
+  }
+
+  if (isPlainObject(value)) {
+    const obj = {};
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      if (isPollutionKey(key)) continue;
+      const childPath = currentPath ? currentPath + '.' + key : key;
+      obj[key] = deepCloneOptions(value[key], childPath);
+    }
+    return obj;
+  }
+
+  // primitive
+  return value;
+}
+
+function deepMergeOptions(dest) {
+  if (!isPlainObject(dest)) {
+    dest = {};
+  }
+
+  for (let si = 1; si < arguments.length; si += 1) {
+    const src = arguments[si];
+    if (src === null || typeof src === 'undefined') continue;
+    if (!isPlainObject(src)) {
+      const path = '<root>';
+      return deepCloneOptions(src, path);
+    }
+
+    for (const key in src) {
+      if (!Object.prototype.hasOwnProperty.call(src, key)) continue;
+      if (isPollutionKey(key)) continue;
+      const val = src[key];
+      const path = key;
+
+      if (Array.isArray(val)) {
+        dest[key] = deepCloneOptions(val, path);
+        continue;
+      }
+
+      if (isPlainObject(val)) {
+        if (!isPlainObject(dest[key])) {
+          dest[key] = {};
+        }
+        deepMergeOptions(dest[key], val);
+        continue;
+      }
+
+      const valid = assertSafeValue(val, path);
+      dest[key] = val;
+    }
+  }
+
+  return dest;
+}
+
+function mergeOptions() {
+  const args = Array.prototype.slice.call(arguments);
+  args.unshift({});
+  return deepMergeOptions.apply(null, args);
+}
+
+VanillaBrick.utils = VanillaBrick.utils || {};
+VanillaBrick.utils.isPlainObject = isPlainObject;
+VanillaBrick.utils.deepCloneOptions = deepCloneOptions;
+VanillaBrick.utils.deepMergeOptions = deepMergeOptions;
+VanillaBrick.utils.mergeOptions = mergeOptions;
 
 })(window.VanillaBrick);
 

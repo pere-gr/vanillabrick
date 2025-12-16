@@ -1,8 +1,10 @@
-VanillaBrick.components.form = {
-    for: ['form'],
+VanillaBrick.extensions.form = {
+    for: [{ host: 'brick', kind: 'form' }],
     requires: ['dom'],
     ns: 'form',
-    options: {},
+    options: {
+        items:[],
+    },
 
     brick: {
         // Basic form component methods can be added here
