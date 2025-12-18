@@ -1,4 +1,4 @@
-VanillaBrick.extensions.form = {
+export const form = {
     for: [{ host: 'brick', kind: 'form' }],
     requires: ['dom'],
     ns: 'form',
@@ -42,3 +42,7 @@ VanillaBrick.extensions.form = {
     destroy: function () {
     }
 };
+
+
+export default form;
+

@@ -1,4 +1,4 @@
-VanillaBrick.extensions.dom = {
+export const dom = {
   for: [{ host: 'brick', kind: '*' }],
   requires: [],
   ns: 'dom',
@@ -80,8 +80,8 @@ VanillaBrick.extensions.dom = {
   },
 
   destroy: function () {
-    const el = this.brick.options.get('dom.element',null);
-    const listeners = this.brick.options.get('dom.listeners',null);;
+    const el = this.brick.options.get('dom.element', null);
+    const listeners = this.brick.options.get('dom.listeners', null);;
     if (el && Array.isArray(listeners)) {
       for (let i = 0; i < listeners.length; i += 1) {
         const ln = listeners[i];
@@ -92,3 +92,7 @@ VanillaBrick.extensions.dom = {
     }
   }
 };
+
+
+export default dom;
+

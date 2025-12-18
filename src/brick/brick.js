@@ -1,10 +1,15 @@
+import StatusController from '../controllers/statusController.js';
+import RuntimeController from '../controllers/runtimeController.js';
+import OptionsController from '../controllers/optionsController.js';
+import EventBusController from '../controllers/eventsController.js';
+import ExtensionsController from '../controllers/extensionsController.js';
 
 /**
  * Brick constructor.
  * @constructor
  * @param {Object} options
  */
-function Brick(options) {
+export default function Brick(options) {
   const opts = options && typeof options === 'object' ? Object.assign({}, options) : {};
   opts.id = opts.id || this._nextId();
   opts.host = (opts.host || 'brick').toLowerCase();
@@ -28,11 +33,11 @@ function Brick(options) {
     enumerable: true
   });
   const controllers = Object.freeze({
-    status: new VanillaBrick.controllers.status(this),
-    runtime: new VanillaBrick.controllers.runtime(this),
-    options: new VanillaBrick.controllers.options(this, opts),
-    events: new VanillaBrick.controllers.events(this),
-    extensions: new VanillaBrick.controllers.extensions(this),
+    status: new StatusController(this),
+    runtime: new RuntimeController(this),
+    options: new OptionsController(this, opts),
+    events: new EventBusController(this),
+    extensions: new ExtensionsController(this),
   });
   Object.defineProperty(this, '_controllers', {
     value: controllers,
@@ -65,5 +70,3 @@ Object.defineProperty(Brick.prototype, '_nextId', {
   configurable: false,
   enumerable: false
 });
-
-VanillaBrick.brick = Brick;

@@ -1,4 +1,4 @@
-VanillaBrick.extensions.domEvents = {
+export const domEvents = {
   for: [{ host: 'brick', kind: '*' }],
   requires: ['dom'],
   ns: 'dom',
@@ -62,3 +62,7 @@ VanillaBrick.extensions.domEvents = {
   init: function () { },
   destroy: function () { }
 };
+
+
+export default domEvents;
+

@@ -1,15 +1,15 @@
-VanillaBrick.extensions.wireservice = {
+export const wireservice = {
     for: [{ host: 'service', kind: 'wire' }], // Available to all bricks
     requires: [], // No strict requirements
     ns: 'wire',
     options: {},
 
     brick: {
-        register: function (brick,config) {
-            console.log("register",brick,config);
+        register: function (brick, config) {
+            console.log("register", brick, config);
         },
-        login: function (brick,config) {
-            console.log("login",this,brick,config);
+        login: function (brick, config) {
+            console.log("login", this, brick, config);
         }
     },
     events: [
@@ -17,9 +17,13 @@ VanillaBrick.extensions.wireservice = {
             for: 'wire:send:register',
             on: {
                 fn: function (ev) {
-                    console.log("",ev)
+                    console.log("", ev)
                 }
             }
         },
     ],
 }
+
+
+export default wireservice;
+

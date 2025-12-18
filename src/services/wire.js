@@ -1,4 +1,5 @@
-VanillaBrick.services.WireService = {
+const WireService = {
     kind: 'wire',
-
 };
+
+export default WireService;

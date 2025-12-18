@@ -4,7 +4,7 @@
  * @constructor
  * @param {Object} brick - The brick instance this controller belongs to
  */
-function RuntimeController(brick) {
+export default function RuntimeController(brick) {
     this.brick = brick || null;
 }
 
@@ -106,7 +106,3 @@ RuntimeController.prototype.wrap = function (fn, context, meta) {
         return runtime.execute(fn, context, args, meta);
     };
 };
-
-// Expose constructor for per-brick instantiation
-VanillaBrick.controllers = VanillaBrick.controllers || {};
-VanillaBrick.controllers.runtime = RuntimeController;

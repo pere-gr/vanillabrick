@@ -1,0 +1,14 @@
+{
+    "name": "vanillabrick",
+    "version": "1.0.0",
+    "description": "VanillaBrick core library",
+    "main": "dist/vanillabrick.min.js",
+    "type": "module",
+    "scripts": {
+        "build": "node scripts/build.mjs",
+        "dev": "node scripts/build.mjs --dev"
+    },
+    "devDependencies": {
+        "esbuild": "^0.19.0"
+    }
+}

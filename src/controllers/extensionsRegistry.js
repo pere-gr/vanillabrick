@@ -1,13 +1,8 @@
-// Diccionari de definicions d'extensions:
-//   VanillaBrick.extensions.myExt = { ns: "myExt", ... }
-VanillaBrick.extensions = VanillaBrick.extensions || {};
-
-// Petit helper de registre/base
-// (ara mateix només serveix per obtenir totes les definicions)
-VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extensionsRegistry || {
+// Retorna un array amb totes les definicions d'extensions d'un objecte font
+const ExtensionsRegistry = {
   /**
    * Retorna un array amb totes les definicions d'extensions
-   * definides a VanillaBrick.extensions.*
+   * definides a la font (habitualment l'objecte d'extensions passat)
    */
   _cache: {},
 
@@ -24,7 +19,7 @@ VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extension
     }
 
     const host = (brick.host || 'brick').toLowerCase();
-    const kind = brick.kind;
+    const kind = (brick.kind || '').toLowerCase();
     if (!kind) return [];
 
     const cacheKey = host + '::' + kind;
@@ -32,8 +27,9 @@ VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extension
       return this._cache[cacheKey];
     }
 
-    const src = VanillaBrick.extensions || {};
+    const src = (globalThis.VanillaBrick && globalThis.VanillaBrick.extensions) || {};
     const candidates = {};
+    const seenExtensions = new Set();
 
     function normalizeRule(rule) {
       if (!rule || typeof rule !== 'object') return null;
@@ -56,6 +52,9 @@ VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extension
       const def = src[key];
       if (!def || typeof def !== 'object') continue;
 
+      // Skip if we've already seen this exact extension definition object
+      if (seenExtensions.has(def)) continue;
+
       // Normalitzar el nom intern
       if (!def._name) def._name = def.ns || key;
 
@@ -77,6 +76,7 @@ VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extension
 
       if (match) {
         candidates[key] = { name: key, ext: def };
+        seenExtensions.add(def);
       }
     }
 
@@ -90,7 +90,18 @@ VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extension
       if (status[name] === 'visiting') return false; // Cycle detection
       if (status[name] === 'missing') return false;
 
-      const candidate = candidates[name];
+      let candidate = candidates[name];
+
+      // If not found by name, search for a candidate with matching .ns
+      if (!candidate) {
+        for (const k in candidates) {
+          if (candidates[k].ext.ns === name) {
+            candidate = candidates[k];
+            break;
+          }
+        }
+      }
+
       if (!candidate) {
         status[name] = 'missing';
         return false;
@@ -122,4 +133,6 @@ VanillaBrick.controllers.extensionsRegistry = VanillaBrick.controllers.extension
     return sortedList;
   }
 };
+
+export default ExtensionsRegistry;
 

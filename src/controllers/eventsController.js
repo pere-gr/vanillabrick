@@ -1,10 +1,9 @@
-
 /**
  * Per-brick event bus controller.
  * Manages events shaped as "namespace:event:target" with phases before/on/after.
  * @constructor
  */
-function EventBusController(brick) {
+export default function EventBusController(brick) {
   this.brick = brick || null;
   this.handlers = []; // { pattern, compiled, phase, priority, handler }
   this._dispatchCache = {};
@@ -283,9 +282,4 @@ EventBusController.prototype.fire = function (eventName, payload) {
 EventBusController.prototype.fireAsync = function (eventName, payload) {
   return this._run(eventName, payload);
 };
-
-// ---------- Hook to global namespace ----------
-
-VanillaBrick.controllers = VanillaBrick.controllers || {};
-VanillaBrick.controllers.events = EventBusController;
 

@@ -1,4 +1,4 @@
-VanillaBrick.extensions.grid = {
+export const grid = {
   for: [{ host: 'brick', kind: 'grid' }],
   requires: ['dom'],
   ns: 'grid',
@@ -134,4 +134,8 @@ VanillaBrick.extensions.grid = {
 };
 
 
+
+
+
+export default grid;
 

@@ -1,4 +1,4 @@
-VanillaBrick.extensions.domCss = {
+export const domCss = {
   for: [{ host: 'brick', kind: '*' }],
   requires: ['dom'],
   ns: 'css',
@@ -103,5 +103,9 @@ VanillaBrick.extensions.domCss = {
     return true;
   },
 
-  destroy: function () {}
+  destroy: function () { }
 };
+
+
+export default domCss;
+

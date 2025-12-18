@@ -1,4 +1,4 @@
-VanillaBrick.extensions.rows = {
+export const gridRows = {
   for: [{ host: 'brick', kind: 'grid' }],
   requires: ['dom', 'store', 'columns'],
   ns: 'rows',
@@ -68,3 +68,7 @@ VanillaBrick.extensions.rows = {
 
   destroy: function () { }
 };
+
+
+export default gridRows;
+

@@ -1,4 +1,4 @@
-VanillaBrick.extensions.record = {
+export const formRecord = {
     for: [{ host: 'brick', kind: 'form' }],
     requires: ['dom', 'store'],
     ns: 'record',
@@ -70,3 +70,7 @@ VanillaBrick.extensions.record = {
     destroy: function () {
     }
 };
+
+
+export default formRecord;
+
