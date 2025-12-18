@@ -1,4 +1,4 @@
-
+export function setupBootstrap(VanillaBrick) {
   VanillaBrick.base = VanillaBrick.base || {};
   VanillaBrick.configs = VanillaBrick.configs || {};
 
@@ -78,7 +78,7 @@
     el.__brickInstance = brick;
     registry.list.push(brick);
     registry.byId[brick.id] = brick;
-    console.log("Brick",el.id,brick);
+    console.log("Brick", el.id, brick);
     return brick;
   }
 
@@ -125,4 +125,5 @@
       setTimeout(runOnce, 0);
     }
   }
+}
 

@@ -1,8 +1,7 @@
-VanillaBrick.extensions.columns = {
+export const gridColumns = {
   for: [{ host: 'brick', kind: 'grid' }],
   requires: ['dom', 'store'],
   ns: 'columns',
-  options: {},
 
   brick: {
     get: function () {
@@ -91,4 +90,8 @@ VanillaBrick.extensions.columns = {
     }
   }
 };
+
+
+
+export default gridColumns;
 

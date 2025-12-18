@@ -1,4 +1,4 @@
-VanillaBrick.extensions.rowsFocused = {
+export const gridRowsFocused = {
   for: [{ host: 'brick', kind: 'grid' }],
     requires: ['dom', 'rows', 'store'],
     ns: 'rowsFocused',
@@ -74,3 +74,7 @@ VanillaBrick.extensions.rowsFocused = {
 
     destroy: function () { }
 };
+
+
+export default gridRowsFocused;
+

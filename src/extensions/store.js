@@ -21,7 +21,7 @@ const DATA_SAMPLE_ROWS = [
   { code: '20', name: 'twenty', key: 20 },
 ];
 
-VanillaBrick.extensions.store = {
+export const store = {
   for: [
     { host: 'brick', kind: 'form' },
     { host: 'brick', kind: 'grid' }
@@ -140,3 +140,7 @@ VanillaBrick.extensions.store = {
 
   destroy: function () { }
 };
+
+
+export default store;
+

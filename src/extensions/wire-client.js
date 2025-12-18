@@ -1,4 +1,4 @@
-VanillaBrick.extensions.wire = {
+export const wire = {
     for: [{ host: 'brick', kind: '*' }], // Available to all bricks
     requires: [], // No strict requirements
     ns: 'wire',
@@ -6,11 +6,11 @@ VanillaBrick.extensions.wire = {
 
     brick: {
         send: function (eventName, data) {
-            console.warn("send",eventName, data);
-            console.log("this",this);
+            console.warn("send", eventName, data);
+            console.log("this", this);
             if (!this.service) this.ext._connect();
             if (!this.service) return; // Still no service?
-            console.log("this.service",this.service);
+            console.log("this.service", this.service);
             this.service.events.fire('wire:message', {
                 from: this.brick.id,
                 event: eventName,
@@ -26,16 +26,20 @@ VanillaBrick.extensions.wire = {
 
             if (this.ext._service) return;
 
-            let wireKind = this.brick.options.get("wire",null);
+            let wireKind = this.brick.options.get("wire", null);
             if (wireKind == null) return;
 
             // Connect to WireService
-            if (VanillaBrick.service) {
-                this.ext._service = VanillaBrick.service('WireService');
+            if (globalThis.VanillaBrick && globalThis.VanillaBrick.service) {
+                this.ext._service = globalThis.VanillaBrick.service('WireService');
             }
 
             if (this.ext._service) {
-                this.ext._service.wire.register(this.brick,this.brick.options.get("wire",{}));
+                if (this.ext._service.wire && typeof this.ext._service.wire.register === 'function') {
+                    this.ext._service.wire.register(this.brick, this.brick.options.get("wire", {}));
+                } else {
+                    console.warn('[Wire Client] Service found but "wire" extension is missing or invalid on it.', this.ext._service);
+                }
             }
         },
 
@@ -101,3 +105,7 @@ VanillaBrick.extensions.wire = {
 
     destroy: function () { }
 };
+
+
+export default wire;
+

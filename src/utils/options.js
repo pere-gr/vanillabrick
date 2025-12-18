@@ -1,35 +1,19 @@
-// Utilities for safe deep cloning and merging of options objects.
-// Exposed under VanillaBrick.utils.*
-
-function isPlainObject(value) {
+export function isPlainObject(value) {
   if (!value || typeof value !== 'object') return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
 
-function isPollutionKey(key) {
+export function isPollutionKey(key) {
   return key === '__proto__' || key === 'prototype' || key === 'constructor';
 }
 
-function assertSafeValue(value, path) {
-  if (
-    value === null ||
-    typeof value === 'undefined' ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  ) {
-    return { ok: true };
-  }
-  if (Array.isArray(value)) return { ok: true };
-  if (isPlainObject(value)) return { ok: true };
-
-  const msg = 'VanillaBrick options only support primitives, plain objects, and arrays. Invalid at "' + path + '"';
-  console.error(msg, value);
-  return { ok: false };
+export function assertSafeValue(value, path) {
+  // We allow everything now to avoid breaking DOM element references in options
+  return { ok: true };
 }
 
-function deepCloneOptions(value, path) {
+export function deepCloneOptions(value, path) {
   const currentPath = path || '';
   const valid = assertSafeValue(value, currentPath || '<root>');
   if (!valid.ok) {
@@ -60,7 +44,7 @@ function deepCloneOptions(value, path) {
   return value;
 }
 
-function deepMergeOptions(dest) {
+export function deepMergeOptions(dest) {
   if (!isPlainObject(dest)) {
     dest = {};
   }
@@ -100,14 +84,8 @@ function deepMergeOptions(dest) {
   return dest;
 }
 
-function mergeOptions() {
+export function mergeOptions() {
   const args = Array.prototype.slice.call(arguments);
   args.unshift({});
   return deepMergeOptions.apply(null, args);
 }
-
-VanillaBrick.utils = VanillaBrick.utils || {};
-VanillaBrick.utils.isPlainObject = isPlainObject;
-VanillaBrick.utils.deepCloneOptions = deepCloneOptions;
-VanillaBrick.utils.deepMergeOptions = deepMergeOptions;
-VanillaBrick.utils.mergeOptions = mergeOptions;

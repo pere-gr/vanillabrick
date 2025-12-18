@@ -1,4 +1,4 @@
-VanillaBrick.extensions.items = {
+export const formItems = {
     for: [{ host: 'brick', kind: 'form' }],
     requires: ['dom'],
     ns: 'items',
@@ -201,3 +201,7 @@ VanillaBrick.extensions.items = {
     destroy: function () {
     }
 };
+
+
+export default formItems;
+

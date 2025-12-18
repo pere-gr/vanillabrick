@@ -1,4 +1,3 @@
-
 /**
  * Per-brick options controller.
  * Guarda valors en objectes nested segons rutes amb punts,
@@ -7,7 +6,7 @@
  * @param {Object} brick
  * @param {Object} initial
  */
-function OptionsController(brick, initial) {
+export default function OptionsController(brick, initial) {
   this.brick = brick;
   this.data = {};
   this._cache = {}; // Cache for O(1) reads
@@ -154,13 +153,13 @@ OptionsController.prototype.setAsync = async function (key, value) {
     key: key,
     value: value,
     previous: oldValue,
-      options: this,
-      brick: brick
-    };
+    options: this,
+    brick: brick
+  };
 
-    // amb target: "options:value:<key>"
-    await brick.events.fireAsync('options:value:' + key, payload);
-    return this;
+  // amb target: "options:value:<key>"
+  await brick.events.fireAsync('options:value:' + key, payload);
+  return this;
 };
 
 /**
@@ -356,6 +355,3 @@ function flattenEntries(src, prefix, target) {
     }
   }
 }
-
-VanillaBrick.controllers = VanillaBrick.controllers || {};
-VanillaBrick.controllers.options = OptionsController;

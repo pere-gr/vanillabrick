@@ -1,10 +1,9 @@
-
 /**
  * Status Controller
  * Manages the lifecycle state of the brick via EventBus.
  * @constructor
  */
-function StatusController(brick) {
+export default function StatusController(brick) {
     this.brick = brick;
     this._status = 'initializing';
     this._listening = false;
@@ -63,5 +62,3 @@ StatusController.prototype.set = function (newStatus, payload) {
 StatusController.prototype.is = function (status) {
     return this._status === status;
 };
-
-VanillaBrick.controllers.status = StatusController;

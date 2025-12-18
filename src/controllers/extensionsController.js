@@ -1,4 +1,5 @@
-
+import ExtensionsRegistry from './extensionsRegistry.js';
+import { mergeOptions } from '../utils/options.js';
 
 function parseForPattern(pattern) {
   if (!pattern) return { ns: '', action: '', target: '*' };
@@ -8,12 +9,6 @@ function parseForPattern(pattern) {
   let target = bits.length > 2 ? bits.slice(2).join(':') : '*';
   if (!target) target = '*';
   return { ns: ns, action: action, target: target };
-}
-
-function ExtensionsController(brick) {
-  this.brick = brick;
-  this.extensions = {};
-  this._destroyHook = false;
 }
 
 function isArrowFunction(fn) {
@@ -27,8 +22,14 @@ function isArrowFunction(fn) {
   }
 }
 
+export default function ExtensionsController(brick) {
+  this.brick = brick;
+  this.extensions = {};
+  this._destroyHook = false;
+}
+
 ExtensionsController.prototype.applyAll = function () {
-  const registry = VanillaBrick.controllers.extensionsRegistry;
+  const registry = ExtensionsRegistry;
   if (!registry || typeof registry.all !== 'function') return;
 
   // Now registry returns a filtered, sorted, valid list
@@ -41,10 +42,9 @@ ExtensionsController.prototype.applyAll = function () {
 
   // Phase 1: merge options before any init()
   const optionsCtrl = this.brick._controllers && this.brick._controllers.options;
-  const utils = VanillaBrick.utils || {};
-  const mergeOptions = utils.mergeOptions;
+
   if (!mergeOptions || typeof mergeOptions !== 'function') {
-    console.error('VanillaBrick.utils.mergeOptions is missing; cannot merge extension defaults safely');
+    console.error('mergeOptions is missing; cannot merge extension defaults safely');
   } else if (optionsCtrl && typeof optionsCtrl.all === 'function') {
     const userOptions = optionsCtrl.all();
     const kind = (this.brick.kind || '').toLowerCase();
@@ -265,5 +265,3 @@ ExtensionsController.prototype._ensureDestroyHook = function () {
     }
   );
 };
-
-VanillaBrick.controllers.extensions = ExtensionsController;
