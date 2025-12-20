@@ -33,14 +33,14 @@ export const store = {
   // API pública sobre el brick (this === brick)
   brick: {
     load: function () {
-      return this.options.get('store.data', []);
+      return this.brick.options.get('store.data', []);
     },
     set: function (data) {
       if (data === null) return;
-      const previous = this.options.get('store.data', []);
+      const previous = this.brick.options.get('store.data', []);
       data = Array.isArray(data) ? data.slice() : [data];
 
-      this.events.fire('store:data:set', {
+      this.brick.events.fire('store:data:set', {
         previous: previous,
         data: data
       });
@@ -48,10 +48,10 @@ export const store = {
       return data;
     },
     setAsync: async function (data) {
-      const previous = this.options.get('store.data', []);
+      const previous = this.brick.options.get('store.data', []);
       data = Array.isArray(data) ? data.slice() : [];
 
-      await this.events.fireAsync('store:data:set', {
+      await this.brick.events.fireAsync('store:data:set', {
         previous: previous,
         data: data
       });
@@ -59,10 +59,10 @@ export const store = {
       return data;
     },
     all: function () {
-      return this.store.load();
+      return this.brick.store.load();
     },
     get: function (index) {
-      const arr = this.store.load();
+      const arr = this.brick.store.load();
       if (typeof index !== 'number') return null;
       if (index < 0 || index >= arr.length) return null;
       return arr[index];

@@ -6,7 +6,7 @@ export const gridRows = {
 
   brick: {
     render: function () {
-      const root = this.dom.element();
+      const root = this.brick.dom.element();
       if (!root) return;
 
       const table = root.tagName && root.tagName.toLowerCase() === 'table'
@@ -14,8 +14,8 @@ export const gridRows = {
         : root.querySelector && root.querySelector('table');
       if (!table) return;
 
-      const columns = this.columns.get();
-      const rows = this.store.load();
+      const columns = this.brick.columns.get();
+      const rows = this.brick.store.load();
 
       let tbody = (table.tBodies && table.tBodies.length)
         ? table.tBodies[0]

@@ -1,36 +1,45 @@
 /**
- * Per-brick event bus controller.
+ * Event Bus Controller (Global Singleton)
  * Manages events shaped as "namespace:event:target" with phases before/on/after.
  * @constructor
  */
-export default function EventBusController(brick) {
-  this.brick = brick || null;
-  this.handlers = []; // { pattern, compiled, phase, priority, handler }
-  this._dispatchCache = {};
-  this.phases = ['before', 'on', 'after'];
-
-  // Expose public EventBus API on the brick
-  var bus = this;
-  if (brick) {
-    brick.events = {
-      on: function (pattern, phase, priority, handler, meta) {
-        bus.on(pattern, phase, priority, handler, meta);
-        return brick; // permet chaining
-      },
-      off: function (pattern, phase, handler) {
-        bus.off(pattern, phase, handler);
-        return brick;
-      },
-      fire: function (eventName, payload) {
-        bus.fire(eventName, payload);
-        return brick;
-      },
-      fireAsync: function (eventName, payload) {
-        return bus.fireAsync(eventName, payload);
-      }
-    };
-  }
+export default function EventBusController() {
+  // No per-brick state here yet (will use WeakMap later)
+  this.phases = ['before', 'on', 'after']; // Shared constant
 }
+
+/**
+ * Initialize event bus for a brick
+ */
+EventBusController.prototype.init = function (brick) {
+  if (!brick || !brick._runtime) return;
+
+  // Initialize per-brick state
+  brick._runtime.events = {
+    handlers: [],
+    dispatchCache: {}
+  };
+
+  // Create public API
+  const self = this;
+  brick.events = {
+    on: function (pattern, phase, priority, handler, meta) {
+      self.on(brick, pattern, phase, priority, handler, meta);
+      return brick;
+    },
+    off: function (pattern, phase, handler) {
+      self.off(brick, pattern, phase, handler);
+      return brick;
+    },
+    fire: function (eventName, payload) {
+      self.fire(brick, eventName, payload);
+      return brick;
+    },
+    fireAsync: function (eventName, payload) {
+      return self.fireAsync(brick, eventName, payload);
+    }
+  };
+};
 
 // ---------- Internal utils ----------
 
@@ -106,30 +115,37 @@ EventBusController.prototype._validateEventName = function (eventName) {
  * Returns matched handlers grouped by phase for a specific event name.
  * Uses caching. The cache key is the full eventName string.
  */
-EventBusController.prototype._getHandlersForEvent = function (eventName) {
-  if (this._dispatchCache[eventName]) {
-    return this._dispatchCache[eventName];
-  }
+EventBusController.prototype._getHandlersForEvent = function (brick, eventName, phase) {
+  if (!brick || !brick._runtime || !brick._runtime.events) return phase ? [] : { before: [], on: [], after: [] };
+  const state = brick._runtime.events;
+  let handlersByPhase;
 
-  const key = this._parseEventKey(eventName);
-  const result = {
-    before: [],
-    on: [],
-    after: []
-  };
+  if (state.dispatchCache[eventName]) {
+    handlersByPhase = state.dispatchCache[eventName];
+  } else {
+    const key = this._parseEventKey(eventName);
+    handlersByPhase = {
+      before: [],
+      on: [],
+      after: []
+    };
 
-  // this.handlers is expected to be sorted by priority globally
-  for (let i = 0; i < this.handlers.length; i += 1) {
-    const h = this.handlers[i];
-    if (this._matches(h.compiled, key)) {
-      if (result[h.phase]) {
-        result[h.phase].push(h);
+    for (let i = 0; i < state.handlers.length; i += 1) {
+      const h = state.handlers[i];
+      if (this._matches(h.compiled, key)) {
+        if (handlersByPhase[h.phase]) {
+          handlersByPhase[h.phase].push(h);
+        }
       }
     }
+    state.dispatchCache[eventName] = handlersByPhase;
   }
 
-  this._dispatchCache[eventName] = result;
-  return result;
+  if (phase) {
+    return handlersByPhase[phase] || [];
+  }
+
+  return handlersByPhase;
 };
 
 // ---------- Subscription API ----------
@@ -140,7 +156,7 @@ EventBusController.prototype._getHandlersForEvent = function (eventName) {
  * phase: "before" | "on" | "after" (default "on")
  * priority: 0..10 (default 5, 0 = highest priority)
  */
-EventBusController.prototype.on = function (pattern, phase, priority, handler, meta) {
+EventBusController.prototype.on = function (brick, pattern, phase, priority, handler, meta) {
   // Signature compatibility: on(pattern, phase, priority, handler, meta)
   // Optional args shifting
   if (typeof phase === 'function') {
@@ -153,14 +169,17 @@ EventBusController.prototype.on = function (pattern, phase, priority, handler, m
     handler = priority;
     priority = undefined;
   }
-  if (typeof handler !== 'function') return;
+  if (!handler) return;
+  // handler can be a function OR an object { fn, ctx, meta }
 
   let ph = phase || 'on';
   if (this.phases.indexOf(ph) === -1) ph = 'on';
 
   const pr = this._normalizePriority(priority);
 
-  this.handlers.push({
+  const state = brick._runtime.events;
+
+  state.handlers.push({
     pattern: pattern,
     compiled: this._compilePattern(pattern),
     phase: ph,
@@ -170,37 +189,94 @@ EventBusController.prototype.on = function (pattern, phase, priority, handler, m
   });
 
   // Sort by priority asc (0 = first)
-  this.handlers.sort(function (a, b) {
+  state.handlers.sort(function (a, b) {
     const pa = typeof a.priority === 'number' ? a.priority : 5;
     const pb = typeof b.priority === 'number' ? b.priority : 5;
     return pa - pb;
   });
 
   // Invalidate cache on any subscription change
-  this._dispatchCache = {};
+  state.dispatchCache = {};
 };
 
 /**
  * Unregister handlers filtered by pattern, phase and/or handler.
  */
-EventBusController.prototype.off = function (pattern, phase, handler) {
-  for (let i = this.handlers.length - 1; i >= 0; i -= 1) {
-    const h = this.handlers[i];
+EventBusController.prototype.off = function (brick, pattern, phase, handler) {
+  if (!brick || !brick._runtime || !brick._runtime.events) return;
+  const state = brick._runtime.events;
+
+  for (let i = state.handlers.length - 1; i >= 0; i -= 1) {
+    const h = state.handlers[i];
     if (pattern && h.pattern !== pattern) continue;
     if (phase && h.phase !== phase) continue;
     if (handler && h.handler !== handler) continue;
-    this.handlers.splice(i, 1);
+    state.handlers.splice(i, 1);
   }
   // Invalidate cache on any unsubscription
-  this._dispatchCache = {};
+  state.dispatchCache = {};
 };
 
 // ---------- Pipeline execution (async core) ----------
 
-EventBusController.prototype._run = async function (eventName, payload) {
+/**
+ * Internal phase execution.
+ */
+EventBusController.prototype._firePhase = async function (brick, phase, eventName, ev) {
+  ev.event.phase = phase;
+  ev.stopPhase = false;
+
+  const phaseHandlers = this._getHandlersForEvent(brick, eventName, phase);
+  const runtime = (globalThis.VanillaBrick) ? globalThis.VanillaBrick.runtime : null;
+
+  for (let i = 0; i < phaseHandlers.length; i += 1) {
+    if (ev.stopPhase) break;
+
+    const h = phaseHandlers[i];
+    const hnd = h.handler;
+
+    try {
+      let r;
+      if (hnd && typeof hnd === 'object' && typeof hnd.fn === 'function') {
+        // Execute via descriptor (Extension Handler)
+        if (runtime) {
+          r = runtime.execute(hnd.fn, hnd.ctx, [ev], hnd.meta);
+        } else {
+          r = hnd.fn.apply(hnd.ctx, [ev]);
+        }
+      } else if (typeof hnd === 'function') {
+        // Legacy/Direct function case
+        if (runtime) {
+          r = runtime.execute(hnd, { brick: brick }, [ev], h.meta);
+        } else {
+          r = hnd(ev, { brick: brick });
+        }
+      }
+
+      if (r && typeof r.then === 'function') {
+        await r;
+      }
+    } catch (err) {
+      console.error('Error in event handler execution:', err, { h, eventName, phase });
+      ev.errors.push({ error: err, phase: phase, event: eventName });
+      ev.cancel = true;
+    }
+  }
+
+  return ev;
+};
+
+EventBusController.prototype._run = async function (brick, eventName, payload) {
+  if (!brick || !brick._runtime || !brick._runtime.events) {
+    return {
+      event: { name: eventName },
+      errors: [{ error: 'Event system not initialized for this brick' }],
+      cancel: true
+    };
+  }
+
   // 1. Validation
   if (!this._validateEventName(eventName)) {
-    // Return a dummy error object so awaits don't crash, but do not process
     return {
       event: { name: eventName },
       errors: [{ error: 'Invalid event name format or wildcards in dispatch' }],
@@ -208,57 +284,29 @@ EventBusController.prototype._run = async function (eventName, payload) {
     };
   }
 
-  // 2. Cache Lookup
-  const phases = this.phases;
-  const handlersByPhase = this._getHandlersForEvent(eventName);
-
-  // We parse again just to populate the event meta object accurately
+  // 2. Context Initialization
   const key = this._parseEventKey(eventName);
-
-  // 3. Event Object Construction
   const ev = {
-    brick: this.brick || null,
-    cancel: false, // if true, skip "on" phase
+    brick: brick || null,
+    cancel: false,
     data: payload,
-    errors: [], // collected handler errors
+    errors: [],
     event: {
-      phase: null, // "before" | "on" | "after"
+      phase: null,
       name: eventName,
       namespace: key.namespace,
-      type: key.type,   // Renamed from 'event' to 'type'
+      type: key.type,
       target: key.target,
     },
-    stopPhase: false, // if true, stop the current phase loop
+    stopPhase: false,
   };
 
-  // 4. Execution Loop
+  // 3. Sequential Phase Execution
+  const phases = this.phases;
   for (let p = 0; p < phases.length; p += 1) {
     const phase = phases[p];
-
-    // If canceled, skip "on" phase, but continue to "after"
     if (phase === 'on' && ev.cancel) continue;
-
-    ev.event.phase = phase;
-    const phaseHandlers = handlersByPhase[phase] || [];
-
-    for (let i = 0; i < phaseHandlers.length; i += 1) {
-      if (ev.stopPhase) break;
-
-      const h = phaseHandlers[i];
-
-      try {
-        // Pass event and context
-        const r = h.handler(ev, { brick: this.brick });
-        if (r && typeof r.then === 'function') {
-          await r; // support async handlers
-        }
-      } catch (err) {
-        console.error('Error in handler', h.handler, { pattern: h.pattern, phase: h.phase, meta: h.meta }, err);
-        ev.errors.push({ error: err, meta: h.meta, pattern: h.pattern, phase: h.phase });
-        // Force cancel on error to prevent inconsistent state
-        ev.cancel = true;
-      }
-    }
+    await this._firePhase(brick, phase, eventName, ev);
   }
 
   return ev;
@@ -270,16 +318,15 @@ EventBusController.prototype._run = async function (eventName, payload) {
  * Fire-and-forget event.
  * eventName: "namespace:type:target"
  */
-EventBusController.prototype.fire = function (eventName, payload) {
+EventBusController.prototype.fire = function (brick, eventName, payload) {
   // Fire-and-forget; use fireAsync() if you need the final event object.
-  this._run(eventName, payload);
+  this._run(brick, eventName, payload);
 };
 
 /**
  * Fire an event and get a Promise with the final event object
  * (to inspect cancel/errors/meta).
  */
-EventBusController.prototype.fireAsync = function (eventName, payload) {
-  return this._run(eventName, payload);
+EventBusController.prototype.fireAsync = function (brick, eventName, payload) {
+  return this._run(brick, eventName, payload);
 };
-

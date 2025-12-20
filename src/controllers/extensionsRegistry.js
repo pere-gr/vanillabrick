@@ -131,6 +131,89 @@ const ExtensionsRegistry = {
 
     this._cache[cacheKey] = sortedList;
     return sortedList;
+  },
+
+  /**
+   * Genera els prototips i contextos per a un brick específic o de forma genèrica.
+   * Aquesta funció es crida una vegada per tipus d'extensió per generar els "motlles".
+   */
+  _bake: function (defs) {
+    const prototypes = {};
+
+    for (let i = 0; i < defs.length; i++) {
+      const def = defs[i];
+      const name = def.name || def.ext.ns;
+
+      // 1. Prototype for the extension context (ctxExt)
+      // Contains the extension definition and helper methods.
+      // 'brick' will be assigned at instantiation time.
+      const protoExt = {
+        _name: name,
+        _def: def.ext
+      };
+
+      // Bake internal extension methods into the prototype
+      // This ensures 'this._helper()' works inside init/destroy/handlers
+      if (def.ext.extension && typeof def.ext.extension === 'object') {
+        for (const k in def.ext.extension) {
+          if (typeof def.ext.extension[k] === 'function') {
+            protoExt[k] = def.ext.extension[k];
+          }
+        }
+      }
+
+      // 2. Prototype for the API context (ctxApi)
+      // Contains the 'brick' API methods exposed by this extension.
+      // These methods are bound to ctxApi, which has access to ctxExt.
+      const protoApi = {};
+
+      // Bake API methods
+      if (def.ext.brick) {
+        for (const k in def.ext.brick) {
+          if (typeof def.ext.brick[k] === 'function') {
+            // We use a closure here to trap 'name' and 'k' correctly
+            (function (methodName, methodFn, extName) {
+              protoApi[methodName] = function () {
+                // This function will be called on the namespace object (e.g. brick.grid.refresh())
+                // We need to find the specific context for this extension instance
+
+                // 'this' is the namespace object (brick[ns])
+                // It contains _extData map: { extName: { ctx: ctxApi, fns:..., meta:... } }
+                const extData = this._extData && this._extData[extName];
+
+                if (!extData) {
+                  console.warn(`VanillaBrick: Extension data not found for ${extName} in namespace API call ${methodName}`);
+                  return;
+                }
+
+                const args = Array.prototype.slice.call(arguments);
+                const runtime = (globalThis.VanillaBrick) ? globalThis.VanillaBrick.runtime : null;
+
+                if (runtime && typeof runtime.execute === 'function') {
+                  // Metadata for debugging/tracing
+                  const meta = {
+                    type: 'brick-api',
+                    ext: extName,
+                    brick: extData.ctx.brick ? extData.ctx.brick.id : 'unknown',
+                    fnName: methodName
+                  };
+                  return runtime.execute(methodFn, extData.ctx, args, meta);
+                }
+
+                return methodFn.apply(extData.ctx, args);
+              };
+            })(k, def.ext.brick[k], name);
+          }
+        }
+      }
+
+      prototypes[name] = {
+        ext: protoExt,
+        api: protoApi
+      };
+    }
+
+    return prototypes;
   }
 };
 

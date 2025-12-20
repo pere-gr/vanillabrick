@@ -1,11 +1,11 @@
 /**
- * Runtime controller - wraps all developer code execution from extensions.
+ * Runtime controller (Global Singleton)
+ * Wraps all developer code execution from extensions.
  * Provides centralized error handling and metadata capture for debugging.
  * @constructor
- * @param {Object} brick - The brick instance this controller belongs to
  */
-export default function RuntimeController(brick) {
-    this.brick = brick || null;
+export default function RuntimeController() {
+    // No per-brick state
 }
 
 /**
@@ -18,15 +18,12 @@ export default function RuntimeController(brick) {
  *   - type: 'event' | 'init' | 'destroy' | 'brick-api' | 'extension-private'
  *   - ext: extension name
  *   - brick: brick.id (optional)
- *   - event: event name (optional, for event handlers)
- *   - phase: event phase (optional, for event handlers)
- *   - fnName: function name (optional)
- * @returns {*} The result of the function execution
  */
 RuntimeController.prototype.execute = function (fn, context, args, meta) {
     "use strict";
     if (typeof fn !== 'function') {
-        console.warn('[RuntimeController] Attempted to execute non-function', meta);
+        const brickId = (meta && meta.brick) || (context && context.brick && context.brick.id) || 'unknown';
+        console.warn(`[RuntimeController] Attempted to execute non-function for brick ${brickId}`, meta);
         return undefined;
     }
 
@@ -51,15 +48,16 @@ RuntimeController.prototype.execute = function (fn, context, args, meta) {
 /**
  * Handle errors from developer code execution.
  * Logs detailed information including source code for debugging.
- * 
- * @param {Error} err - The error that occurred
- * @param {Function} fn - The function that threw the error
- * @param {Object} context - The context the function was executed in
- * @param {Object} meta - Metadata about the execution
- * @private
  */
 RuntimeController.prototype._handleError = function (err, fn, context, meta) {
     var brickCtx = (context && context.brick) ? context.brick : context;
+    // If context is weird, try to get brick from meta or fallback
+    if (!brickCtx || !brickCtx.id) {
+        if (meta && meta.brick) {
+            brickCtx = { id: meta.brick };
+        }
+    }
+
     const errorInfo = {
         error: err,
         message: err.message || String(err),
@@ -79,30 +77,4 @@ RuntimeController.prototype._handleError = function (err, fn, context, meta) {
     }
 
     console.error('[RuntimeController] Error executing developer code:', errorInfo);
-
-    // Future: delegate to errorController
-    // if (this.errorController && typeof this.errorController.handle === 'function') {
-    //   this.errorController.handle(errorInfo);
-    // }
-};
-
-/**
- * Wrap a function with runtime execution protection.
- * Returns a new function that will execute through the runtime controller.
- * 
- * @param {Function} fn - The function to wrap
- * @param {Object} context - The 'this' context for the function
- * @param {Object} meta - Metadata for debugging
- * @returns {Function} Wrapped function
- */
-RuntimeController.prototype.wrap = function (fn, context, meta) {
-    if (typeof fn !== 'function') {
-        return fn;
-    }
-
-    const runtime = this;
-    return function wrappedFunction() {
-        const args = Array.prototype.slice.call(arguments);
-        return runtime.execute(fn, context, args, meta);
-    };
 };

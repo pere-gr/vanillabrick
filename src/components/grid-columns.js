@@ -8,7 +8,7 @@ export const gridColumns = {
       return this.options.get("grid.columns", []);
     },
     sort: function (field, dir) {
-      const cols = this.columns.get();
+      const cols = this.brick.columns.get();
       const colDef = cols.find(function (c) { return c && c.datafield === field; }) || {};
       const state = this.options.get("grid.sort", { field: null, dir: null });
       let nextDir = dir;

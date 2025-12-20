@@ -17,6 +17,9 @@
 </head>
 
 <body>
+  <script>
+    console.log('Memòria inicial:', performance.memory.usedJSHeapSize / 1024 / 1024, 'MB');
+  </script>
   <div class="vb-container-fluid">
     <header>
       <h1>VanillaBrick Demo</h1>
@@ -122,6 +125,23 @@
 
     </div>
   </div>
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        const memMB = performance.memory.usedJSHeapSize / 1024 / 1024;
+        console.log('=== MESURA DE MEMÒRIA (5s després de load) ===');
+        console.log('RAM total utilitzada:', memMB.toFixed(2), 'MB');
+        
+        if (window.VanillaBrick && window.VanillaBrick.runtime) {
+          const protos = Object.keys(VanillaBrick.runtime.prototypes || {}).length;
+          const bricks = VanillaBrick.runtime.bricks ? VanillaBrick.runtime.bricks.length : 0;
+          console.log('Prototips carregats:', protos);
+          console.log('Bricks actius:', bricks);
+          console.log('RAM per brick (aprox):', bricks > 0 ? (memMB / bricks).toFixed(3) : 'N/A', 'MB');
+        }
+      }, 5000);
+    });
+  </script>
 </body>
 
 </html>

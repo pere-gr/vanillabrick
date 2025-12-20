@@ -1,64 +1,67 @@
 /**
- * Status Controller
- * Manages the lifecycle state of the brick via EventBus.
+ * Status Controller (Global Singleton)
+ * Manages the lifecycle state of a brick (init, ready, destroyed, etc.)
  * @constructor
  */
-export default function StatusController(brick) {
-    this.brick = brick;
-    this._status = 'initializing';
-    this._listening = false;
-
-    // Expose public Status API on the brick
-    var self = this;
-    if (brick) {
-        brick.status = {
-            get: function () {
-                return self.get();
-            },
-            set: function (newStatus) {
-                return self.set(newStatus);
-            },
-            is: function (status) {
-                return self.is(status);
-            }
-        };
-    }
+export default function StatusController() {
+    // No per-brick state here
 }
 
-StatusController.prototype.get = function () {
-    return this._status;
+/**
+ * Initialize status for a brick
+ * @param {Object} brick
+ */
+StatusController.prototype.init = function (brick) {
+    if (!brick || !brick._runtime) return;
+    brick._runtime.status = {
+        value: 'initializing',
+        listening: true
+    };
+
+    // Note: brick.status API wrapper is created in brick.js
 };
 
-StatusController.prototype.set = function (newStatus, payload) {
-    // Fallback: if events system is not available yet (very early init), just set it.
-    if (!this.brick.events) {
-        this._status = newStatus;
-        return;
-    }
+/**
+ * Get current status
+ */
+StatusController.prototype.get = function (brick) {
+    return brick && brick._runtime && brick._runtime.status ? brick._runtime.status.value : undefined;
+};
 
-    // Lazy registration: ensure internal state is updated via EventBus 'on' phase
-    if (!this._listening) {
-        var self = this;
-        // Wildcard listener to catch ANY status change event (brick:status:ready, etc.)
-        this.brick.events.on('brick:status:*', 'on', function (ev) {
-            // Update internal state from payload
-            if (ev.data && ev.data.status) {
-                self._status = ev.data.status;
-            }
+/**
+ * Check if current status matches
+ */
+StatusController.prototype.is = function (brick, status) {
+    if (!brick || !brick._runtime || !brick._runtime.status) return false;
+    return brick._runtime.status.value === status;
+};
+
+/**
+ * Set status and fire event
+ */
+StatusController.prototype.set = function (brick, newStatus, payload) {
+    if (!brick || !brick._runtime || !brick._runtime.status) return;
+    const state = brick._runtime.status;
+    if (!state.listening) return;
+    if (state.value === newStatus) return;
+
+    const oldStatus = state.value;
+    state.value = newStatus;
+
+    // Fire generic change event
+    if (brick.events) {
+        brick.events.fire('brick:status:change', {
+            from: oldStatus,
+            to: newStatus,
+            ...payload
         });
-        this._listening = true;
+
+        // Fire specific event (e.g. brick:status:ready)
+        brick.events.fire('brick:status:' + newStatus, payload);
     }
 
-    // Prepare event data mixing standard fields with payload
-    var eventData = Object.assign({}, payload || {}, {
-        status: newStatus,
-        from: this._status
-    });
-
-    // Fire specific event dynamic name: e.g., "brick:status:ready"
-    this.brick.events.fire('brick:status:' + newStatus, eventData);
-};
-
-StatusController.prototype.is = function (status) {
-    return this._status === status;
+    if (newStatus === 'destroyed') {
+        state.listening = false;
+        // Cleanup events maybe? managed by destroy hook usually
+    }
 };

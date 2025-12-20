@@ -1,544 +1,124 @@
 (() => {
   var __defProp = Object.defineProperty;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
   var __export = (target, all) => {
     for (var name in all)
       __defProp(target, name, { get: all[name], enumerable: true });
   };
 
-  // src/controllers/statusController.js
-  function StatusController(brick) {
-    this.brick = brick;
-    this._status = "initializing";
-    this._listening = false;
-    var self = this;
-    if (brick) {
-      brick.status = {
-        get: function() {
-          return self.get();
-        },
-        set: function(newStatus) {
-          return self.set(newStatus);
-        },
-        is: function(status) {
-          return self.is(status);
-        }
-      };
-    }
-  }
-  StatusController.prototype.get = function() {
-    return this._status;
-  };
-  StatusController.prototype.set = function(newStatus, payload) {
-    if (!this.brick.events) {
-      this._status = newStatus;
-      return;
-    }
-    if (!this._listening) {
-      var self = this;
-      this.brick.events.on("brick:status:*", "on", function(ev) {
-        if (ev.data && ev.data.status) {
-          self._status = ev.data.status;
-        }
-      });
-      this._listening = true;
-    }
-    var eventData = Object.assign({}, payload || {}, {
-      status: newStatus,
-      from: this._status
+  // src/brick/brick.js
+  function Brick(options) {
+    const opts = options && typeof options === "object" ? Object.assign({}, options) : {};
+    opts.id = opts.id || this._nextId();
+    opts.host = (opts.host || "brick").toLowerCase();
+    opts.kind = (opts.kind || "brick").toLowerCase();
+    Object.defineProperty(this, "id", {
+      value: opts.id,
+      writable: false,
+      configurable: false,
+      enumerable: true
     });
-    this.brick.events.fire("brick:status:" + newStatus, eventData);
-  };
-  StatusController.prototype.is = function(status) {
-    return this._status === status;
-  };
-
-  // src/controllers/runtimeController.js
-  function RuntimeController(brick) {
-    this.brick = brick || null;
-  }
-  RuntimeController.prototype.execute = function(fn, context, args, meta) {
-    "use strict";
-    if (typeof fn !== "function") {
-      console.warn("[RuntimeController] Attempted to execute non-function", meta);
-      return void 0;
-    }
-    try {
-      const result = fn.apply(context, args);
-      if (result && typeof result.then === "function") {
-        return result.catch(function(err) {
-          this._handleError(err, fn, context, meta);
-          return Promise.reject(err);
-        }.bind(this));
-      }
-      return result;
-    } catch (err) {
-      this._handleError(err, fn, context, meta);
-      throw err;
-    }
-  };
-  RuntimeController.prototype._handleError = function(err, fn, context, meta) {
-    var brickCtx = context && context.brick ? context.brick : context;
-    const errorInfo = {
-      error: err,
-      message: err.message || String(err),
-      stack: err.stack,
-      meta: meta || {},
-      context: {
-        brick: brickCtx && brickCtx.id ? brickCtx.id : null,
-        kind: brickCtx && brickCtx.kind ? brickCtx.kind : null
-      }
+    Object.defineProperty(this, "host", {
+      value: opts.host,
+      writable: false,
+      configurable: false,
+      enumerable: true
+    });
+    Object.defineProperty(this, "kind", {
+      value: opts.kind,
+      writable: false,
+      configurable: false,
+      enumerable: true
+    });
+    Object.defineProperty(this, "_runtime", {
+      value: {},
+      writable: false,
+      configurable: false,
+      enumerable: false
+    });
+    Object.defineProperty(this, "_controllers", {
+      value: globalThis.VanillaBrick.runtime.controllers,
+      writable: false,
+      configurable: false,
+      enumerable: false
+    });
+    const brick = this;
+    const ctrl = this._controllers;
+    if (ctrl.status)
+      ctrl.status.init(brick);
+    if (ctrl.options)
+      ctrl.options.init(brick, opts);
+    if (ctrl.events)
+      ctrl.events.init(brick);
+    if (ctrl.extensions)
+      ctrl.extensions.init(brick);
+    this.status = {
+      get: () => ctrl.status.get(brick),
+      set: (status, payload) => ctrl.status.set(brick, status, payload),
+      is: (status) => ctrl.status.is(brick, status)
     };
-    try {
-      errorInfo.fnSource = fn.toString();
-    } catch (e) {
-      errorInfo.fnSource = "[unable to capture source]";
-    }
-    console.error("[RuntimeController] Error executing developer code:", errorInfo);
-  };
-  RuntimeController.prototype.wrap = function(fn, context, meta) {
-    if (typeof fn !== "function") {
-      return fn;
-    }
-    const runtime = this;
-    return function wrappedFunction() {
-      const args = Array.prototype.slice.call(arguments);
-      return runtime.execute(fn, context, args, meta);
-    };
-  };
-
-  // src/controllers/optionsController.js
-  function OptionsController(brick, initial) {
-    this.brick = brick;
-    this.data = {};
-    this._cache = {};
-    this._eventsBound = false;
-    if (initial && typeof initial === "object") {
-      for (const k in initial) {
-        if (Object.prototype.hasOwnProperty.call(initial, k)) {
-          setPath(this.data, toPath(k), initial[k]);
-        }
-      }
-    }
-    var ctrl = this;
-    brick.options = {
-      get: function(key, fallback) {
-        return ctrl.get(key, fallback);
-      },
-      // Síncron: dispara events via fire()
-      set: function(key, value) {
-        ctrl.setSync(key, value);
+    this.options = {
+      get: (key, fallback) => ctrl.options.get(brick, key, fallback),
+      set: (key, value) => {
+        ctrl.options.setSync(brick, key, value);
         return brick;
       },
-      // Async: dispara events via fireAsync()
-      setAsync: async function(key, value) {
-        await ctrl.setAsync(key, value);
+      setAsync: async (key, value) => {
+        await ctrl.options.setAsync(brick, key, value);
         return brick;
       },
-      has: function(key) {
-        return ctrl.has(key);
-      },
-      all: function() {
-        return ctrl.all();
-      },
-      setSilent: function(key, value) {
-        ctrl.setSilent(key, value);
+      has: (key) => ctrl.options.has(brick, key),
+      all: () => ctrl.options.all(brick),
+      setSilent: (key, value) => {
+        ctrl.options.setSilent(brick, key, value);
         return brick;
       }
     };
-  }
-  OptionsController.prototype._ensureEventsBinding = function() {
-    if (this._eventsBound)
-      return;
-    var brick = this.brick;
-    var self = this;
-    brick.events.on("options:value:*", "on", 5, function(ev) {
-      self._apply(ev);
-    });
-    this._eventsBound = true;
-  };
-  OptionsController.prototype._apply = function(ev) {
-    if (!ev)
-      return;
-    var payload = ev.data || {};
-    this._cache = {};
-    if (payload.batch && payload.values && typeof payload.values === "object") {
-      for (var k in payload.values) {
-        if (Object.prototype.hasOwnProperty.call(payload.values, k)) {
-          setPath(this.data, toPath(k), payload.values[k]);
-        }
-      }
-      return;
+    if (ctrl.extensions) {
+      ctrl.extensions.applyAll(brick);
     }
-    if (typeof payload.key === "string") {
-      setPath(this.data, toPath(payload.key), payload.value);
-    }
-  };
-  OptionsController.prototype.setAsync = async function(key, value) {
-    this._ensureEventsBinding();
-    var brick = this.brick;
-    if (key && typeof key === "object" && !Array.isArray(key)) {
-      var values = {};
-      var previous = {};
-      flattenEntries(key, "", values);
-      for (var vk in values) {
-        if (!Object.prototype.hasOwnProperty.call(values, vk))
-          continue;
-        previous[vk] = getWithFallback(this.data, vk);
-      }
-      var batchPayload = {
-        batch: true,
-        values,
-        previous,
-        options: this,
-        brick
-      };
-      await brick.events.fireAsync("options:value:batch", batchPayload);
-      return this;
-    }
-    var oldValue = getWithFallback(this.data, key);
-    var payload = {
-      key,
-      value,
-      previous: oldValue,
-      options: this,
-      brick
-    };
-    await brick.events.fireAsync("options:value:" + key, payload);
-    return this;
-  };
-  OptionsController.prototype.setSync = function(key, value) {
-    this._ensureEventsBinding();
-    var brick = this.brick;
-    if (key && typeof key === "object" && !Array.isArray(key)) {
-      var values = {};
-      var previous = {};
-      flattenEntries(key, "", values);
-      for (var vk in values) {
-        if (!Object.prototype.hasOwnProperty.call(values, vk))
-          continue;
-        previous[vk] = getWithFallback(this.data, vk);
-      }
-      var batchPayload = {
-        batch: true,
-        values,
-        previous,
-        options: this,
-        brick
-      };
-      brick.events.fire("options:value:batch", batchPayload);
-      return this;
-    }
-    var oldValue = getWithFallback(this.data, key);
-    var payload = {
-      key,
-      value,
-      previous: oldValue,
-      options: this,
-      brick
-    };
-    brick.events.fire("options:value:" + key, payload);
-    return this;
-  };
-  OptionsController.prototype.set = OptionsController.prototype.setAsync;
-  OptionsController.prototype.setSilent = function(key, value) {
-    this._cache = {};
-    if (key && typeof key === "object" && !Array.isArray(key)) {
-      flattenEntries(key, "", this.data);
-      return this;
-    }
-    setPath(this.data, toPath(key), value);
-    return this;
-  };
-  OptionsController.prototype.get = function(key, fallback) {
-    if (Object.prototype.hasOwnProperty.call(this._cache, key)) {
-      return this._cache[key];
-    }
-    var val = getWithFallback(this.data, key);
-    var result = typeof val === "undefined" ? fallback : val;
-    this._cache[key] = result;
-    return result;
-  };
-  OptionsController.prototype.has = function(key) {
-    var path = toPath(key);
-    if (!path.length)
-      return false;
-    var nested = hasPath(this.data, path);
-    if (nested)
-      return true;
-    return Object.prototype.hasOwnProperty.call(this.data, key);
-  };
-  OptionsController.prototype.all = function() {
-    return Object.assign({}, this.data);
-  };
-  function toPath(key) {
-    if (!key && key !== 0)
-      return [];
-    if (Array.isArray(key))
-      return key;
-    return String(key).split(".").filter(function(p) {
-      return p !== "";
-    });
-  }
-  function setPath(obj, path, value) {
-    if (!path.length)
-      return;
-    var cur = obj;
-    for (var i = 0; i < path.length - 1; i += 1) {
-      var seg = path[i];
-      if (!cur[seg] || typeof cur[seg] !== "object") {
-        cur[seg] = {};
-      }
-      cur = cur[seg];
-    }
-    cur[path[path.length - 1]] = value;
-  }
-  function getPath(obj, path) {
-    var cur = obj;
-    for (var i = 0; i < path.length; i += 1) {
-      var seg = path[i];
-      if (!cur || !Object.prototype.hasOwnProperty.call(cur, seg)) {
-        return void 0;
-      }
-      cur = cur[seg];
-    }
-    return cur;
-  }
-  function hasPath(obj, path) {
-    var cur = obj;
-    for (var i = 0; i < path.length; i += 1) {
-      var seg = path[i];
-      if (!cur || !Object.prototype.hasOwnProperty.call(cur, seg)) {
-        return false;
-      }
-      cur = cur[seg];
-    }
-    return true;
-  }
-  function getWithFallback(data, key) {
-    var path = toPath(key);
-    if (path.length) {
-      var nested = getPath(data, path);
-      if (typeof nested !== "undefined")
-        return nested;
-    }
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
-      return data[key];
-    }
-    return void 0;
-  }
-  function flattenEntries(src, prefix, target) {
-    for (var k in src) {
-      if (!Object.prototype.hasOwnProperty.call(src, k))
-        continue;
-      var path = prefix ? prefix + "." + k : k;
-      var val = src[k];
-      if (val && typeof val === "object" && !Array.isArray(val)) {
-        flattenEntries(val, path, target);
-      } else {
-        target[path] = val;
-      }
+    if (ctrl.status) {
+      ctrl.status.set(brick, "ready", { options: opts });
     }
   }
-
-  // src/controllers/eventsController.js
-  function EventBusController(brick) {
-    this.brick = brick || null;
-    this.handlers = [];
-    this._dispatchCache = {};
-    this.phases = ["before", "on", "after"];
-    var bus = this;
-    if (brick) {
-      brick.events = {
-        on: function(pattern, phase, priority, handler, meta) {
-          bus.on(pattern, phase, priority, handler, meta);
-          return brick;
-        },
-        off: function(pattern, phase, handler) {
-          bus.off(pattern, phase, handler);
-          return brick;
-        },
-        fire: function(eventName, payload) {
-          bus.fire(eventName, payload);
-          return brick;
-        },
-        fireAsync: function(eventName, payload) {
-          return bus.fireAsync(eventName, payload);
-        }
-      };
+  Brick.prototype.destroy = function() {
+    this._controllers.status.set(this, "destroyed");
+    if (this._runtime) {
+      this._runtime.status = {};
+      this._runtime.options = {};
+      this._runtime.events = {};
+      this._runtime.extensions = {};
     }
-  }
-  EventBusController.prototype._normalizePriority = function(priority) {
-    let pr = typeof priority === "number" ? priority : 5;
-    if (pr < 0)
-      pr = 0;
-    if (pr > 10)
-      pr = 10;
-    return pr;
   };
-  EventBusController.prototype._compilePattern = function(pattern) {
-    const parts = (pattern || "").split(":");
-    const ns = parts[0];
-    const type = parts[1];
-    const target = parts[2];
-    return {
-      namespace: !ns || ns === "*" ? void 0 : ns,
-      type: !type || type === "*" ? void 0 : type,
-      target: !target || target === "*" ? void 0 : target
-    };
-  };
-  EventBusController.prototype._parseEventKey = function(eventName) {
-    const parts = (eventName || "").split(":");
-    return {
-      namespace: parts[0] || "",
-      type: parts[1] || "",
-      target: parts[2] || ""
-    };
-  };
-  EventBusController.prototype._matches = function(compiled, key) {
-    return (compiled.namespace === void 0 || compiled.namespace === key.namespace) && (compiled.type === void 0 || compiled.type === key.type) && (compiled.target === void 0 || compiled.target === key.target);
-  };
-  EventBusController.prototype._validateEventName = function(eventName) {
-    if (typeof eventName !== "string") {
-      console.error("[EventBus] Event name must be a string.", eventName);
-      return false;
-    }
-    const parts = eventName.split(":");
-    if (parts.length !== 3) {
-      console.error('[EventBus] Invalid event name format. Expected exactly "namespace:type:target" (3 segments). Got:', eventName);
-      return false;
-    }
-    if (!parts[0] || parts[0] === "*" || !parts[1] || parts[1] === "*" || !parts[2] || parts[2] === "*") {
-      console.error("[EventBus] Invalid event name for dispatch. Wildcards (*) and empty segments are not allowed in namespace, type, or target.", eventName);
-      return false;
-    }
-    return true;
-  };
-  EventBusController.prototype._getHandlersForEvent = function(eventName) {
-    if (this._dispatchCache[eventName]) {
-      return this._dispatchCache[eventName];
-    }
-    const key = this._parseEventKey(eventName);
-    const result = {
-      before: [],
-      on: [],
-      after: []
-    };
-    for (let i = 0; i < this.handlers.length; i += 1) {
-      const h = this.handlers[i];
-      if (this._matches(h.compiled, key)) {
-        if (result[h.phase]) {
-          result[h.phase].push(h);
-        }
-      }
-    }
-    this._dispatchCache[eventName] = result;
-    return result;
-  };
-  EventBusController.prototype.on = function(pattern, phase, priority, handler, meta) {
-    if (typeof phase === "function") {
-      meta = handler;
-      handler = phase;
-      phase = "on";
-      priority = void 0;
-    } else if (typeof priority === "function" && typeof handler !== "function") {
-      meta = handler;
-      handler = priority;
-      priority = void 0;
-    }
-    if (typeof handler !== "function")
-      return;
-    let ph = phase || "on";
-    if (this.phases.indexOf(ph) === -1)
-      ph = "on";
-    const pr = this._normalizePriority(priority);
-    this.handlers.push({
-      pattern,
-      compiled: this._compilePattern(pattern),
-      phase: ph,
-      handler,
-      priority: pr,
-      meta: meta || null
-    });
-    this.handlers.sort(function(a, b) {
-      const pa = typeof a.priority === "number" ? a.priority : 5;
-      const pb = typeof b.priority === "number" ? b.priority : 5;
-      return pa - pb;
-    });
-    this._dispatchCache = {};
-  };
-  EventBusController.prototype.off = function(pattern, phase, handler) {
-    for (let i = this.handlers.length - 1; i >= 0; i -= 1) {
-      const h = this.handlers[i];
-      if (pattern && h.pattern !== pattern)
-        continue;
-      if (phase && h.phase !== phase)
-        continue;
-      if (handler && h.handler !== handler)
-        continue;
-      this.handlers.splice(i, 1);
-    }
-    this._dispatchCache = {};
-  };
-  EventBusController.prototype._run = async function(eventName, payload) {
-    if (!this._validateEventName(eventName)) {
-      return {
-        event: { name: eventName },
-        errors: [{ error: "Invalid event name format or wildcards in dispatch" }],
-        cancel: true
-      };
-    }
-    const phases = this.phases;
-    const handlersByPhase = this._getHandlersForEvent(eventName);
-    const key = this._parseEventKey(eventName);
-    const ev = {
-      brick: this.brick || null,
-      cancel: false,
-      // if true, skip "on" phase
-      data: payload,
-      errors: [],
-      // collected handler errors
-      event: {
-        phase: null,
-        // "before" | "on" | "after"
-        name: eventName,
-        namespace: key.namespace,
-        type: key.type,
-        // Renamed from 'event' to 'type'
-        target: key.target
-      },
-      stopPhase: false
-      // if true, stop the current phase loop
-    };
-    for (let p = 0; p < phases.length; p += 1) {
-      const phase = phases[p];
-      if (phase === "on" && ev.cancel)
-        continue;
-      ev.event.phase = phase;
-      const phaseHandlers = handlersByPhase[phase] || [];
-      for (let i = 0; i < phaseHandlers.length; i += 1) {
-        if (ev.stopPhase)
-          break;
-        const h = phaseHandlers[i];
-        try {
-          const r = h.handler(ev, { brick: this.brick });
-          if (r && typeof r.then === "function") {
-            await r;
-          }
-        } catch (err) {
-          console.error("Error in handler", h.handler, { pattern: h.pattern, phase: h.phase, meta: h.meta }, err);
-          ev.errors.push({ error: err, meta: h.meta, pattern: h.pattern, phase: h.phase });
-          ev.cancel = true;
-        }
-      }
-    }
-    return ev;
-  };
-  EventBusController.prototype.fire = function(eventName, payload) {
-    this._run(eventName, payload);
-  };
-  EventBusController.prototype.fireAsync = function(eventName, payload) {
-    return this._run(eventName, payload);
-  };
+  Object.defineProperty(Brick, "_idCounter", {
+    value: 0,
+    writable: true,
+    configurable: false,
+    enumerable: false
+  });
+  Object.defineProperty(Brick.prototype, "_nextId", {
+    value: function() {
+      Brick._idCounter += 1;
+      return "brick-" + Brick._idCounter;
+    },
+    writable: false,
+    configurable: false,
+    enumerable: false
+  });
 
   // src/controllers/extensionsRegistry.js
   var ExtensionsRegistry = {
@@ -657,100 +237,505 @@
       }
       this._cache[cacheKey] = sortedList;
       return sortedList;
+    },
+    /**
+     * Genera els prototips i contextos per a un brick específic o de forma genèrica.
+     * Aquesta funció es crida una vegada per tipus d'extensió per generar els "motlles".
+     */
+    _bake: function(defs) {
+      const prototypes = {};
+      for (let i = 0; i < defs.length; i++) {
+        const def = defs[i];
+        const name = def.name || def.ext.ns;
+        const protoExt = {
+          _name: name,
+          _def: def.ext
+        };
+        if (def.ext.extension && typeof def.ext.extension === "object") {
+          for (const k in def.ext.extension) {
+            if (typeof def.ext.extension[k] === "function") {
+              protoExt[k] = def.ext.extension[k];
+            }
+          }
+        }
+        const protoApi = {};
+        if (def.ext.brick) {
+          for (const k in def.ext.brick) {
+            if (typeof def.ext.brick[k] === "function") {
+              (function(methodName, methodFn, extName) {
+                protoApi[methodName] = function() {
+                  const extData = this._extData && this._extData[extName];
+                  if (!extData) {
+                    console.warn(`VanillaBrick: Extension data not found for ${extName} in namespace API call ${methodName}`);
+                    return;
+                  }
+                  const args = Array.prototype.slice.call(arguments);
+                  const runtime = globalThis.VanillaBrick ? globalThis.VanillaBrick.runtime : null;
+                  if (runtime && typeof runtime.execute === "function") {
+                    const meta = {
+                      type: "brick-api",
+                      ext: extName,
+                      brick: extData.ctx.brick ? extData.ctx.brick.id : "unknown",
+                      fnName: methodName
+                    };
+                    return runtime.execute(methodFn, extData.ctx, args, meta);
+                  }
+                  return methodFn.apply(extData.ctx, args);
+                };
+              })(k, def.ext.brick[k], name);
+            }
+          }
+        }
+        prototypes[name] = {
+          ext: protoExt,
+          api: protoApi
+        };
+      }
+      return prototypes;
     }
   };
   var extensionsRegistry_default = ExtensionsRegistry;
 
+  // src/controllers/runtimeController.js
+  function RuntimeController() {
+  }
+  RuntimeController.prototype.execute = function(fn, context, args, meta) {
+    "use strict";
+    if (typeof fn !== "function") {
+      const brickId = meta && meta.brick || context && context.brick && context.brick.id || "unknown";
+      console.warn(`[RuntimeController] Attempted to execute non-function for brick ${brickId}`, meta);
+      return void 0;
+    }
+    try {
+      const result = fn.apply(context, args);
+      if (result && typeof result.then === "function") {
+        return result.catch(function(err) {
+          this._handleError(err, fn, context, meta);
+          return Promise.reject(err);
+        }.bind(this));
+      }
+      return result;
+    } catch (err) {
+      this._handleError(err, fn, context, meta);
+      throw err;
+    }
+  };
+  RuntimeController.prototype._handleError = function(err, fn, context, meta) {
+    var brickCtx = context && context.brick ? context.brick : context;
+    if (!brickCtx || !brickCtx.id) {
+      if (meta && meta.brick) {
+        brickCtx = { id: meta.brick };
+      }
+    }
+    const errorInfo = {
+      error: err,
+      message: err.message || String(err),
+      stack: err.stack,
+      meta: meta || {},
+      context: {
+        brick: brickCtx && brickCtx.id ? brickCtx.id : null,
+        kind: brickCtx && brickCtx.kind ? brickCtx.kind : null
+      }
+    };
+    try {
+      errorInfo.fnSource = fn.toString();
+    } catch (e) {
+      errorInfo.fnSource = "[unable to capture source]";
+    }
+    console.error("[RuntimeController] Error executing developer code:", errorInfo);
+  };
+
+  // src/controllers/statusController.js
+  function StatusController() {
+  }
+  StatusController.prototype.init = function(brick) {
+    if (!brick || !brick._runtime)
+      return;
+    brick._runtime.status = {
+      value: "initializing",
+      listening: true
+    };
+  };
+  StatusController.prototype.get = function(brick) {
+    return brick && brick._runtime && brick._runtime.status ? brick._runtime.status.value : void 0;
+  };
+  StatusController.prototype.is = function(brick, status) {
+    if (!brick || !brick._runtime || !brick._runtime.status)
+      return false;
+    return brick._runtime.status.value === status;
+  };
+  StatusController.prototype.set = function(brick, newStatus, payload) {
+    if (!brick || !brick._runtime || !brick._runtime.status)
+      return;
+    const state = brick._runtime.status;
+    if (!state.listening)
+      return;
+    if (state.value === newStatus)
+      return;
+    const oldStatus = state.value;
+    state.value = newStatus;
+    if (brick.events) {
+      brick.events.fire("brick:status:change", __spreadValues({
+        from: oldStatus,
+        to: newStatus
+      }, payload));
+      brick.events.fire("brick:status:" + newStatus, payload);
+    }
+    if (newStatus === "destroyed") {
+      state.listening = false;
+    }
+  };
+
   // src/utils/options.js
   var options_exports = {};
   __export(options_exports, {
-    assertSafeValue: () => assertSafeValue,
-    deepCloneOptions: () => deepCloneOptions,
-    deepMergeOptions: () => deepMergeOptions,
-    isPlainObject: () => isPlainObject,
-    isPollutionKey: () => isPollutionKey,
-    mergeOptions: () => mergeOptions
+    getOption: () => getOption,
+    mergeOptions: () => mergeOptions,
+    setOption: () => setOption
   });
-  function isPlainObject(value) {
-    if (!value || typeof value !== "object")
-      return false;
-    const proto = Object.getPrototypeOf(value);
-    return proto === Object.prototype || proto === null;
-  }
-  function isPollutionKey(key) {
-    return key === "__proto__" || key === "prototype" || key === "constructor";
-  }
-  function assertSafeValue(value, path) {
-    return { ok: true };
-  }
-  function deepCloneOptions(value, path) {
-    const currentPath = path || "";
-    const valid = assertSafeValue(value, currentPath || "<root>");
-    if (!valid.ok) {
-      return value;
-    }
-    if (Array.isArray(value)) {
-      const arr = new Array(value.length);
-      for (let i = 0; i < value.length; i += 1) {
-        arr[i] = deepCloneOptions(value[i], currentPath ? currentPath + "[" + i + "]" : "[" + i + "]");
-      }
-      return arr;
-    }
-    if (isPlainObject(value)) {
-      const obj = {};
-      for (const key in value) {
-        if (!Object.prototype.hasOwnProperty.call(value, key))
-          continue;
-        if (isPollutionKey(key))
-          continue;
-        const childPath = currentPath ? currentPath + "." + key : key;
-        obj[key] = deepCloneOptions(value[key], childPath);
-      }
-      return obj;
-    }
-    return value;
-  }
-  function deepMergeOptions(dest) {
-    if (!isPlainObject(dest)) {
-      dest = {};
-    }
-    for (let si = 1; si < arguments.length; si += 1) {
-      const src = arguments[si];
-      if (src === null || typeof src === "undefined")
-        continue;
-      if (!isPlainObject(src)) {
-        const path = "<root>";
-        return deepCloneOptions(src, path);
-      }
-      for (const key in src) {
-        if (!Object.prototype.hasOwnProperty.call(src, key))
-          continue;
-        if (isPollutionKey(key))
-          continue;
-        const val = src[key];
-        const path = key;
-        if (Array.isArray(val)) {
-          dest[key] = deepCloneOptions(val, path);
-          continue;
-        }
-        if (isPlainObject(val)) {
-          if (!isPlainObject(dest[key])) {
-            dest[key] = {};
-          }
-          deepMergeOptions(dest[key], val);
-          continue;
-        }
-        const valid = assertSafeValue(val, path);
-        dest[key] = val;
-      }
-    }
-    return dest;
-  }
   function mergeOptions() {
-    const args = Array.prototype.slice.call(arguments);
-    args.unshift({});
-    return deepMergeOptions.apply(null, args);
+    const result = {};
+    for (let i = 0; i < arguments.length; i++) {
+      const source = arguments[i];
+      if (!source || typeof source !== "object")
+        continue;
+      for (const key in source) {
+        if (!Object.prototype.hasOwnProperty.call(source, key))
+          continue;
+        const sVal = source[key];
+        const rVal = result[key];
+        if (sVal && typeof sVal === "object" && !Array.isArray(sVal) && rVal && typeof rVal === "object" && !Array.isArray(rVal)) {
+          result[key] = mergeOptions(rVal, sVal);
+        } else {
+          result[key] = sVal;
+        }
+      }
+    }
+    return result;
   }
+  function getOption(obj, path) {
+    if (!obj || !path)
+      return void 0;
+    if (!path.indexOf("."))
+      return obj[path];
+    const parts = path.split(".");
+    let current = obj;
+    for (let i = 0; i < parts.length; i++) {
+      if (current === void 0 || current === null)
+        return void 0;
+      current = current[parts[i]];
+    }
+    return current;
+  }
+  function setOption(obj, path, value) {
+    if (!obj || !path)
+      return;
+    const parts = path.split(".");
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const p = parts[i];
+      if (current[p] === void 0 || current[p] === null) {
+        current[p] = {};
+      }
+      current = current[p];
+    }
+    current[parts[parts.length - 1]] = value;
+  }
+
+  // src/controllers/optionsController.js
+  function OptionsController() {
+  }
+  OptionsController.prototype.init = function(brick, initialOptions) {
+    if (!brick || !brick._runtime)
+      return;
+    brick._runtime.options = {
+      data: initialOptions || {},
+      cache: {}
+    };
+  };
+  OptionsController.prototype.all = function(brick) {
+    return brick && brick._runtime && brick._runtime.options ? brick._runtime.options.data : {};
+  };
+  OptionsController.prototype.has = function(brick, key) {
+    const data = brick && brick._runtime && brick._runtime.options ? brick._runtime.options.data : {};
+    const val = getOption(data, key);
+    return val !== void 0;
+  };
+  OptionsController.prototype.get = function(brick, key, fallback) {
+    const state = brick && brick._runtime ? brick._runtime.options : null;
+    if (!state)
+      return fallback;
+    if (state.cache && Object.prototype.hasOwnProperty.call(state.cache, key)) {
+      return state.cache[key];
+    }
+    const val = getOption(state.data, key);
+    const result = val === void 0 ? fallback : val;
+    if (state.cache) {
+      state.cache[key] = result;
+    }
+    return result;
+  };
+  OptionsController.prototype.setSync = function(brick, key, value) {
+    const state = brick && brick._runtime ? brick._runtime.options : null;
+    if (!state)
+      return;
+    const old = this.get(brick, key);
+    if (old === value)
+      return;
+    setOption(state.data, key, value);
+    state.cache = {};
+    if (brick.events) {
+      brick.events.fire("brick:option:changed", { key, value, oldValue: old });
+      brick.events.fire("brick:option:changed:" + key, { value, oldValue: old });
+    }
+  };
+  OptionsController.prototype.setSilent = function(brick, key, value) {
+    const state = brick && brick._runtime ? brick._runtime.options : null;
+    if (!state)
+      return;
+    setOption(state.data, key, value);
+    state.cache = {};
+  };
+  OptionsController.prototype.setAsync = async function(brick, key, value) {
+    this.setSync(brick, key, value);
+    return Promise.resolve();
+  };
+
+  // src/controllers/eventsController.js
+  function EventBusController() {
+    this.phases = ["before", "on", "after"];
+  }
+  EventBusController.prototype.init = function(brick) {
+    if (!brick || !brick._runtime)
+      return;
+    brick._runtime.events = {
+      handlers: [],
+      dispatchCache: {}
+    };
+    const self = this;
+    brick.events = {
+      on: function(pattern, phase, priority, handler, meta) {
+        self.on(brick, pattern, phase, priority, handler, meta);
+        return brick;
+      },
+      off: function(pattern, phase, handler) {
+        self.off(brick, pattern, phase, handler);
+        return brick;
+      },
+      fire: function(eventName, payload) {
+        self.fire(brick, eventName, payload);
+        return brick;
+      },
+      fireAsync: function(eventName, payload) {
+        return self.fireAsync(brick, eventName, payload);
+      }
+    };
+  };
+  EventBusController.prototype._normalizePriority = function(priority) {
+    let pr = typeof priority === "number" ? priority : 5;
+    if (pr < 0)
+      pr = 0;
+    if (pr > 10)
+      pr = 10;
+    return pr;
+  };
+  EventBusController.prototype._compilePattern = function(pattern) {
+    const parts = (pattern || "").split(":");
+    const ns = parts[0];
+    const type = parts[1];
+    const target = parts[2];
+    return {
+      namespace: !ns || ns === "*" ? void 0 : ns,
+      type: !type || type === "*" ? void 0 : type,
+      target: !target || target === "*" ? void 0 : target
+    };
+  };
+  EventBusController.prototype._parseEventKey = function(eventName) {
+    const parts = (eventName || "").split(":");
+    return {
+      namespace: parts[0] || "",
+      type: parts[1] || "",
+      target: parts[2] || ""
+    };
+  };
+  EventBusController.prototype._matches = function(compiled, key) {
+    return (compiled.namespace === void 0 || compiled.namespace === key.namespace) && (compiled.type === void 0 || compiled.type === key.type) && (compiled.target === void 0 || compiled.target === key.target);
+  };
+  EventBusController.prototype._validateEventName = function(eventName) {
+    if (typeof eventName !== "string") {
+      console.error("[EventBus] Event name must be a string.", eventName);
+      return false;
+    }
+    const parts = eventName.split(":");
+    if (parts.length !== 3) {
+      console.error('[EventBus] Invalid event name format. Expected exactly "namespace:type:target" (3 segments). Got:', eventName);
+      return false;
+    }
+    if (!parts[0] || parts[0] === "*" || !parts[1] || parts[1] === "*" || !parts[2] || parts[2] === "*") {
+      console.error("[EventBus] Invalid event name for dispatch. Wildcards (*) and empty segments are not allowed in namespace, type, or target.", eventName);
+      return false;
+    }
+    return true;
+  };
+  EventBusController.prototype._getHandlersForEvent = function(brick, eventName, phase) {
+    if (!brick || !brick._runtime || !brick._runtime.events)
+      return phase ? [] : { before: [], on: [], after: [] };
+    const state = brick._runtime.events;
+    let handlersByPhase;
+    if (state.dispatchCache[eventName]) {
+      handlersByPhase = state.dispatchCache[eventName];
+    } else {
+      const key = this._parseEventKey(eventName);
+      handlersByPhase = {
+        before: [],
+        on: [],
+        after: []
+      };
+      for (let i = 0; i < state.handlers.length; i += 1) {
+        const h = state.handlers[i];
+        if (this._matches(h.compiled, key)) {
+          if (handlersByPhase[h.phase]) {
+            handlersByPhase[h.phase].push(h);
+          }
+        }
+      }
+      state.dispatchCache[eventName] = handlersByPhase;
+    }
+    if (phase) {
+      return handlersByPhase[phase] || [];
+    }
+    return handlersByPhase;
+  };
+  EventBusController.prototype.on = function(brick, pattern, phase, priority, handler, meta) {
+    if (typeof phase === "function") {
+      meta = handler;
+      handler = phase;
+      phase = "on";
+      priority = void 0;
+    } else if (typeof priority === "function" && typeof handler !== "function") {
+      meta = handler;
+      handler = priority;
+      priority = void 0;
+    }
+    if (!handler)
+      return;
+    let ph = phase || "on";
+    if (this.phases.indexOf(ph) === -1)
+      ph = "on";
+    const pr = this._normalizePriority(priority);
+    const state = brick._runtime.events;
+    state.handlers.push({
+      pattern,
+      compiled: this._compilePattern(pattern),
+      phase: ph,
+      handler,
+      priority: pr,
+      meta: meta || null
+    });
+    state.handlers.sort(function(a, b) {
+      const pa = typeof a.priority === "number" ? a.priority : 5;
+      const pb = typeof b.priority === "number" ? b.priority : 5;
+      return pa - pb;
+    });
+    state.dispatchCache = {};
+  };
+  EventBusController.prototype.off = function(brick, pattern, phase, handler) {
+    if (!brick || !brick._runtime || !brick._runtime.events)
+      return;
+    const state = brick._runtime.events;
+    for (let i = state.handlers.length - 1; i >= 0; i -= 1) {
+      const h = state.handlers[i];
+      if (pattern && h.pattern !== pattern)
+        continue;
+      if (phase && h.phase !== phase)
+        continue;
+      if (handler && h.handler !== handler)
+        continue;
+      state.handlers.splice(i, 1);
+    }
+    state.dispatchCache = {};
+  };
+  EventBusController.prototype._firePhase = async function(brick, phase, eventName, ev) {
+    ev.event.phase = phase;
+    ev.stopPhase = false;
+    const phaseHandlers = this._getHandlersForEvent(brick, eventName, phase);
+    const runtime = globalThis.VanillaBrick ? globalThis.VanillaBrick.runtime : null;
+    for (let i = 0; i < phaseHandlers.length; i += 1) {
+      if (ev.stopPhase)
+        break;
+      const h = phaseHandlers[i];
+      const hnd = h.handler;
+      try {
+        let r;
+        if (hnd && typeof hnd === "object" && typeof hnd.fn === "function") {
+          if (runtime) {
+            r = runtime.execute(hnd.fn, hnd.ctx, [ev], hnd.meta);
+          } else {
+            r = hnd.fn.apply(hnd.ctx, [ev]);
+          }
+        } else if (typeof hnd === "function") {
+          if (runtime) {
+            r = runtime.execute(hnd, { brick }, [ev], h.meta);
+          } else {
+            r = hnd(ev, { brick });
+          }
+        }
+        if (r && typeof r.then === "function") {
+          await r;
+        }
+      } catch (err) {
+        console.error("Error in event handler execution:", err, { h, eventName, phase });
+        ev.errors.push({ error: err, phase, event: eventName });
+        ev.cancel = true;
+      }
+    }
+    return ev;
+  };
+  EventBusController.prototype._run = async function(brick, eventName, payload) {
+    if (!brick || !brick._runtime || !brick._runtime.events) {
+      return {
+        event: { name: eventName },
+        errors: [{ error: "Event system not initialized for this brick" }],
+        cancel: true
+      };
+    }
+    if (!this._validateEventName(eventName)) {
+      return {
+        event: { name: eventName },
+        errors: [{ error: "Invalid event name format or wildcards in dispatch" }],
+        cancel: true
+      };
+    }
+    const key = this._parseEventKey(eventName);
+    const ev = {
+      brick: brick || null,
+      cancel: false,
+      data: payload,
+      errors: [],
+      event: {
+        phase: null,
+        name: eventName,
+        namespace: key.namespace,
+        type: key.type,
+        target: key.target
+      },
+      stopPhase: false
+    };
+    const phases = this.phases;
+    for (let p = 0; p < phases.length; p += 1) {
+      const phase = phases[p];
+      if (phase === "on" && ev.cancel)
+        continue;
+      await this._firePhase(brick, phase, eventName, ev);
+    }
+    return ev;
+  };
+  EventBusController.prototype.fire = function(brick, eventName, payload) {
+    this._run(brick, eventName, payload);
+  };
+  EventBusController.prototype.fireAsync = function(brick, eventName, payload) {
+    return this._run(brick, eventName, payload);
+  };
 
   // src/controllers/extensionsController.js
   function parseForPattern(pattern) {
@@ -764,37 +749,42 @@
       target = "*";
     return { ns, action, target };
   }
-  function isArrowFunction(fn) {
-    if (typeof fn !== "function")
-      return false;
-    if (fn.prototype)
-      return false;
-    try {
-      return fn.toString().indexOf("=>") !== -1;
-    } catch (e) {
-      return false;
-    }
+  function ExtensionsController() {
   }
-  function ExtensionsController(brick) {
-    this.brick = brick;
-    this.extensions = {};
-    this._destroyHook = false;
+  function getRuntime() {
+    return globalThis.VanillaBrick && globalThis.VanillaBrick.runtime ? globalThis.VanillaBrick.runtime : null;
   }
-  ExtensionsController.prototype.applyAll = function() {
+  ExtensionsController.prototype.init = function(brick) {
+    if (!brick || !brick._runtime)
+      return;
+    brick._runtime.extensions = {
+      map: {},
+      // Map of installed extensions { name: ctxExt }
+      destroyHook: false
+    };
+  };
+  ExtensionsController.prototype.applyAll = function(brick) {
     const registry = extensionsRegistry_default;
     if (!registry || typeof registry.all !== "function")
       return;
-    const defs = registry.all(this.brick) || [];
+    const defs = registry.all(brick) || [];
     if (defs.length == 0) {
-      console.warn("No extensions found for this brick", this.brick);
       return;
     }
-    const optionsCtrl = this.brick._controllers && this.brick._controllers.options;
+    const runtime = getRuntime();
+    if (runtime) {
+      if (!runtime.prototypes) {
+        runtime.prototypes = {};
+      }
+      const baked = registry._bake(defs);
+      Object.assign(runtime.prototypes, baked);
+    }
+    const optionsCtrl = brick._controllers && brick._controllers.options;
     if (!mergeOptions || typeof mergeOptions !== "function") {
       console.error("mergeOptions is missing; cannot merge extension defaults safely");
-    } else if (optionsCtrl && typeof optionsCtrl.all === "function") {
-      const userOptions = optionsCtrl.all();
-      const kind = (this.brick.kind || "").toLowerCase();
+    } else if (optionsCtrl && typeof optionsCtrl.get === "function") {
+      const userOptions = brick._runtime && brick._runtime.options ? brick._runtime.options.data : {};
+      const kind = (brick.kind || "").toLowerCase();
       const coreDefaults = [];
       const extDefaults = [];
       for (let i = 0; i < defs.length; i += 1) {
@@ -810,69 +800,82 @@
         }
       }
       const mergedOptions = mergeOptions.apply(null, coreDefaults.concat(extDefaults, [userOptions]));
-      optionsCtrl.data = mergedOptions;
-      optionsCtrl._cache = {};
+      if (brick._runtime && brick._runtime.options) {
+        brick._runtime.options.data = mergedOptions;
+        brick._runtime.options.cache = {};
+      }
     }
     for (let i = 0; i < defs.length; i += 1) {
-      this._install(defs[i]);
+      this._install(brick, defs[i]);
     }
-    this._ensureDestroyHook();
+    this._ensureDestroyHook(brick);
   };
-  ExtensionsController.prototype._install = function(def) {
-    const brick = this.brick;
+  ExtensionsController.prototype._install = function(brick, def) {
     const name = def.name || def.ext.ns || null;
     const ns = def.ext.ns || name;
     if (!name) {
       console.warn("VanillaBrick extension without name/ns, skipped", def);
       return;
     }
-    if (this.extensions[name])
+    const extState = brick && brick._runtime ? brick._runtime.extensions : null;
+    if (!extState)
       return;
-    const ext = {
-      name,
-      def: def.ext,
-      brick
-    };
-    const ctxExt = Object.create(ext);
-    ctxExt.brick = brick;
-    ctxExt.ext = ext;
-    const ctxApi = Object.create(brick);
-    ctxApi.brick = brick;
-    ctxApi.ext = ext;
-    const runtime = brick._controllers.runtime;
-    if (def.ext.extension && typeof def.ext.extension === "object") {
-      for (const k in def.ext.extension) {
-        if (!Object.prototype.hasOwnProperty.call(def.ext.extension, k))
-          continue;
-        const fn = def.ext.extension[k];
-        if (typeof fn === "function") {
-          if (isArrowFunction(fn)) {
-            console.warn("VanillaBrick: arrow functions discouraged for extension private method", { ns: name, fn: k, kind: brick.kind });
+    if (extState.map[name])
+      return;
+    const runtime = getRuntime();
+    const protos = runtime && runtime.prototypes ? runtime.prototypes[name] : null;
+    let ctxExt;
+    if (protos && protos.ext) {
+      ctxExt = Object.create(protos.ext);
+      ctxExt.brick = brick;
+      ctxExt.ext = ctxExt;
+      ctxExt._ctx = ctxExt;
+    } else {
+      const ext = {
+        name,
+        def: def.ext,
+        brick
+      };
+      ctxExt = Object.create(ext);
+      ctxExt.brick = brick;
+      ctxExt.ext = ext;
+      ctxExt._ctx = ctxExt;
+    }
+    Object.defineProperty(ctxExt, "options", { value: brick.options, writable: false, enumerable: false, configurable: true });
+    Object.defineProperty(ctxExt, "events", { value: brick.events, writable: false, enumerable: false, configurable: true });
+    Object.defineProperty(ctxExt, "status", { value: brick.status, writable: false, enumerable: false, configurable: true });
+    const ctxApi = ctxExt;
+    if (!protos) {
+      if (def.ext.extension && typeof def.ext.extension === "object") {
+        for (const k in def.ext.extension) {
+          if (!Object.prototype.hasOwnProperty.call(def.ext.extension, k))
+            continue;
+          const fn = def.ext.extension[k];
+          if (typeof fn === "function") {
+            const meta = { type: "extension-private", ext: name, brick: brick.id, fnName: k };
+            ctxExt[k] = function() {
+              const args = Array.prototype.slice.call(arguments);
+              if (runtime && typeof runtime.execute === "function") {
+                return runtime.execute(fn, ctxExt, args, meta);
+              }
+              return fn.apply(ctxExt, args);
+            };
           }
-          const meta = { type: "extension-private", ext: name, brick: brick.id, fnName: k };
-          ext[k] = function() {
-            const args = Array.prototype.slice.call(arguments);
-            if (runtime && typeof runtime.execute === "function") {
-              return runtime.execute(fn, ctxExt, args, meta);
-            }
-            return fn.apply(ctxExt, args);
-          };
         }
       }
     }
     if (typeof def.ext.init === "function") {
-      const runtime2 = brick._controllers.runtime;
       try {
         let res;
-        if (runtime2 && typeof runtime2.execute === "function") {
-          res = runtime2.execute(def.ext.init, ext, [], {
+        if (runtime && typeof runtime.execute === "function") {
+          res = runtime.execute(def.ext.init, ctxExt, [], {
             type: "init",
             ext: name,
             brick: brick.id,
             fnName: "init"
           });
         } else {
-          res = def.ext.init.call(ext);
+          res = def.ext.init.call(ctxExt);
         }
         if (res === false)
           return;
@@ -882,172 +885,111 @@
       }
     }
     if (def.ext.brick && typeof def.ext.brick === "object") {
-      if (!brick[ns])
-        brick[ns] = {};
+      if (!brick[ns]) {
+        brick[ns] = { _extData: {} };
+      }
       const nsObj = brick[ns];
-      for (const apiName in def.ext.brick) {
-        if (!Object.prototype.hasOwnProperty.call(def.ext.brick, apiName))
-          continue;
-        const apiFn = def.ext.brick[apiName];
-        if (typeof apiFn !== "function") {
-          console.warn('VanillaBrick extension "' + name + '" api "' + apiName + '" is not a function');
-          continue;
-        }
-        if (isArrowFunction(apiFn)) {
-          console.warn("VanillaBrick: arrow functions discouraged for brick API", { ns: name, api: apiName, kind: brick.kind });
-        }
-        if (nsObj[apiName]) {
-          console.warn("VanillaBrick extension overwriting API " + ns + "." + apiName);
-        }
-        const meta = { type: "brick-api", ext: name, brick: brick.id, fnName: ns + "." + apiName };
-        nsObj[apiName] = function() {
-          const args = Array.prototype.slice.call(arguments);
-          if (runtime && typeof runtime.execute === "function") {
-            return runtime.execute(apiFn, ctxApi, args, meta);
-          }
-          return apiFn.apply(ctxApi, args);
-        };
-      }
-    }
-    if (Array.isArray(def.ext.events) && def.ext.events.length && brick._controllers && brick._controllers.events && typeof brick._controllers.events.on === "function") {
-      for (let li = 0; li < def.ext.events.length; li += 1) {
-        const evt = def.ext.events[li];
-        if (!evt)
-          continue;
-        const parsed = parseForPattern(evt.for);
-        const pattern = parsed.ns + ":" + parsed.action + ":" + parsed.target;
-        ["before", "on", "after"].forEach(function(phase) {
-          const desc = evt[phase];
-          if (!desc || typeof desc.fn !== "function")
-            return;
-          if (isArrowFunction(desc.fn)) {
-            console.warn("VanillaBrick: arrow functions discouraged for event handler", { ns: name, event: pattern2, phase, kind: brick.kind });
-          }
-          const pr = typeof desc.priority === "number" ? desc.priority : void 0;
-          const pattern2 = parsed.ns + ":" + parsed.action + ":" + parsed.target;
-          const meta = {
-            type: "event",
-            ext: name,
-            brick: brick.id,
-            event: pattern2,
-            phase,
-            fnName: desc.fn.name || "anon"
-          };
-          const handler = function(ev) {
-            const args = [ev];
+      if (!nsObj._extData)
+        nsObj._extData = {};
+      if (protos && protos.api) {
+        Object.assign(nsObj, protos.api);
+        nsObj._extData[name] = { ctx: ctxApi, fns: def.ext.brick, meta: {} };
+      } else {
+        for (const apiName in def.ext.brick) {
+          if (!Object.prototype.hasOwnProperty.call(def.ext.brick, apiName))
+            continue;
+          const apiFn = def.ext.brick[apiName];
+          if (typeof apiFn !== "function")
+            continue;
+          const meta = { type: "brick-api", ext: name, brick: brick.id, fnName: ns + "." + apiName };
+          nsObj[apiName] = function() {
+            const args = Array.prototype.slice.call(arguments);
             if (runtime && typeof runtime.execute === "function") {
-              return runtime.execute(desc.fn, ctxExt, args, meta);
+              return runtime.execute(apiFn, ctxApi, args, meta);
             }
-            return desc.fn.apply(ctxExt, args);
+            return apiFn.apply(ctxApi, args);
           };
-          brick._controllers.events.on(pattern2, phase, pr, handler, { ext: name, fn: desc.fn.name || "anon", extInstance: ext });
-        });
+        }
       }
     }
-    this.extensions[name] = ext;
+    if (Array.isArray(def.ext.events) && def.ext.events.length) {
+      if (brick.events && typeof brick.events.on === "function") {
+        for (let li = 0; li < def.ext.events.length; li += 1) {
+          const evt = def.ext.events[li];
+          if (!evt)
+            continue;
+          const parsed = parseForPattern(evt.for);
+          const pattern = parsed.ns + ":" + parsed.action + ":" + parsed.target;
+          ["before", "on", "after"].forEach(function(phase) {
+            const desc = evt[phase];
+            if (!desc || typeof desc.fn !== "function")
+              return;
+            const pr = typeof desc.priority === "number" ? desc.priority : void 0;
+            const meta = {
+              type: "event",
+              ext: name,
+              brick: brick.id,
+              event: pattern,
+              phase,
+              fnName: desc.fn.name || "anon"
+            };
+            const handler = function(ev) {
+              const args = [ev];
+              if (runtime && typeof runtime.execute === "function") {
+                return runtime.execute(desc.fn, ctxExt, args, meta);
+              }
+              return desc.fn.apply(ctxExt, args);
+            };
+            brick.events.on(pattern, phase, pr, handler, { ext: name, fn: desc.fn.name });
+          });
+        }
+      }
+    }
+    extState.map[name] = ctxExt;
   };
-  ExtensionsController.prototype._ensureDestroyHook = function() {
-    if (this._destroyHook)
+  ExtensionsController.prototype._ensureDestroyHook = function(brick) {
+    const extState = brick && brick._runtime ? brick._runtime.extensions : null;
+    if (!extState)
       return;
-    const brick = this.brick;
-    if (!brick || !brick._controllers || !brick._controllers.events || typeof brick._controllers.events.on !== "function") {
+    if (extState.destroyHook)
+      return;
+    if (!brick || !brick.events || typeof brick.events.on !== "function") {
       return;
     }
-    this._destroyHook = true;
-    const self = this;
-    brick._controllers.events.on(
+    extState.destroyHook = true;
+    brick.events.on(
       "brick:status:destroyed",
       "on",
       0,
+      // High priority
       function() {
-        for (const name in self.extensions) {
-          if (!Object.prototype.hasOwnProperty.call(self.extensions, name))
+        const runtime = getRuntime();
+        for (const name in extState.map) {
+          if (!Object.prototype.hasOwnProperty.call(extState.map, name))
             continue;
-          const ext = self.extensions[name];
-          if (!ext || !ext.def)
-            continue;
-          const def = ext.def;
+          const ctxExt = extState.map[name];
+          const def = ctxExt._def ? { destroy: ctxExt._def.destroy, ns: ctxExt._name } : ctxExt.def || {};
           if (typeof def.destroy === "function") {
-            const runtime = brick._controllers.runtime;
             try {
               if (runtime && typeof runtime.execute === "function") {
-                runtime.execute(def.destroy, ext, [], {
+                runtime.execute(def.destroy, ctxExt, [], {
                   type: "destroy",
                   ext: name,
                   brick: brick.id,
                   fnName: "destroy"
                 });
               } else {
-                def.destroy.call(ext);
+                def.destroy.call(ctxExt);
               }
             } catch (err) {
-              console.error('VanillaBrick extension "' + (def.ns || name || "?") + '" destroy() failed', err);
+              console.error('VanillaBrick extension "' + name + '" destroy() failed', err);
             }
           }
         }
-        self.extensions = {};
+        extState.map = {};
       }
     );
   };
-
-  // src/brick/brick.js
-  function Brick(options) {
-    const opts = options && typeof options === "object" ? Object.assign({}, options) : {};
-    opts.id = opts.id || this._nextId();
-    opts.host = (opts.host || "brick").toLowerCase();
-    opts.kind = (opts.kind || "brick").toLowerCase();
-    Object.defineProperty(this, "id", {
-      value: opts.id,
-      writable: false,
-      configurable: false,
-      enumerable: true
-    });
-    Object.defineProperty(this, "host", {
-      value: opts.host,
-      writable: false,
-      configurable: false,
-      enumerable: true
-    });
-    Object.defineProperty(this, "kind", {
-      value: opts.kind,
-      writable: false,
-      configurable: false,
-      enumerable: true
-    });
-    const controllers = Object.freeze({
-      status: new StatusController(this),
-      runtime: new RuntimeController(this),
-      options: new OptionsController(this, opts),
-      events: new EventBusController(this),
-      extensions: new ExtensionsController(this)
-    });
-    Object.defineProperty(this, "_controllers", {
-      value: controllers,
-      writable: false,
-      configurable: false,
-      enumerable: false
-    });
-    controllers.extensions.applyAll();
-    controllers.status.set("ready", { options: opts });
-  }
-  Brick.prototype.destroy = function() {
-    this._controllers.status.set("destroyed");
-  };
-  Object.defineProperty(Brick, "_idCounter", {
-    value: 0,
-    writable: true,
-    configurable: false,
-    enumerable: false
-  });
-  Object.defineProperty(Brick.prototype, "_nextId", {
-    value: function() {
-      Brick._idCounter += 1;
-      return "brick-" + Brick._idCounter;
-    },
-    writable: false,
-    configurable: false,
-    enumerable: false
-  });
 
   // src/startup/services.js
   function setupServices(VanillaBrick2) {
@@ -1527,33 +1469,33 @@
     // API pública sobre el brick (this === brick)
     brick: {
       load: function() {
-        return this.options.get("store.data", []);
+        return this.brick.options.get("store.data", []);
       },
       set: function(data) {
         if (data === null)
           return;
-        const previous = this.options.get("store.data", []);
+        const previous = this.brick.options.get("store.data", []);
         data = Array.isArray(data) ? data.slice() : [data];
-        this.events.fire("store:data:set", {
+        this.brick.events.fire("store:data:set", {
           previous,
           data
         });
         return data;
       },
       setAsync: async function(data) {
-        const previous = this.options.get("store.data", []);
+        const previous = this.brick.options.get("store.data", []);
         data = Array.isArray(data) ? data.slice() : [];
-        await this.events.fireAsync("store:data:set", {
+        await this.brick.events.fireAsync("store:data:set", {
           previous,
           data
         });
         return data;
       },
       all: function() {
-        return this.store.load();
+        return this.brick.store.load();
       },
       get: function(index) {
-        const arr = this.store.load();
+        const arr = this.brick.store.load();
         if (typeof index !== "number")
           return null;
         if (index < 0 || index >= arr.length)
@@ -2082,7 +2024,7 @@
         return this.options.get("grid.columns", []);
       },
       sort: function(field, dir) {
-        const cols = this.columns.get();
+        const cols = this.brick.columns.get();
         const colDef = cols.find(function(c) {
           return c && c.datafield === field;
         }) || {};
@@ -2257,14 +2199,14 @@
     options: {},
     brick: {
       render: function() {
-        const root = this.dom.element();
+        const root = this.brick.dom.element();
         if (!root)
           return;
         const table = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector && root.querySelector("table");
         if (!table)
           return;
-        const columns = this.columns.get();
-        const rows = this.store.load();
+        const columns = this.brick.columns.get();
+        const rows = this.brick.store.load();
         let tbody = table.tBodies && table.tBodies.length ? table.tBodies[0] : table.querySelector("tbody");
         if (!tbody) {
           tbody = document.createElement("tbody");
@@ -2529,6 +2471,7 @@
   }
 
   // src/index.js
+  var runtimeCtrl = new RuntimeController();
   var VanillaBrick = {
     brick: Brick,
     registry: extensionsRegistry_default,
@@ -2536,11 +2479,18 @@
     extensions: {},
     services: {},
     configs: {},
-    runtime: {
-      bricks: [],
-      services: {}
-    },
+    runtime: runtimeCtrl,
+    // Global execution motor
     base: {}
+  };
+  VanillaBrick.runtime.bricks = [];
+  VanillaBrick.runtime.services = {};
+  VanillaBrick.runtime.prototypes = {};
+  VanillaBrick.runtime.controllers = {
+    status: new StatusController(),
+    options: new OptionsController(),
+    events: new EventBusController(),
+    extensions: new ExtensionsController()
   };
   globalThis.VanillaBrick = VanillaBrick;
   registerBuiltins(VanillaBrick);
