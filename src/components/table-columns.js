@@ -1,16 +1,16 @@
-export const gridColumns = {
-  for: [{ host: 'brick', kind: 'grid' }],
-  requires: ['dom', 'store'],
+export const tableColumns = {
+  for: [{ host: 'brick', kind: 'table' }],
+  requires: ['html', 'store'],
   ns: 'columns',
 
   brick: {
     get: function () {
-      return this.options.get("grid.columns", []);
+      return this.options.get("table.columns", []);
     },
     sort: function (field, dir) {
       const cols = this.brick.columns.get();
       const colDef = cols.find(function (c) { return c && c.datafield === field; }) || {};
-      const state = this.options.get("grid.sort", { field: null, dir: null });
+      const state = this.options.get("table.sort", { field: null, dir: null });
       let nextDir = dir;
       if (nextDir !== 'asc' && nextDir !== 'desc') {
         nextDir = (state.field === field && state.dir === 'asc') ? 'desc' : 'asc';
@@ -34,7 +34,7 @@ export const gridColumns = {
       on: {
         fn: function () {
           const columns = this.brick.columns.get();
-          const root = this.brick.dom.element && this.brick.dom.element();
+          const root = this.brick.html.element && this.brick.html.element();
           if (!root) return;
 
           const table = root.tagName && root.tagName.toLowerCase() === 'table'
@@ -71,7 +71,7 @@ export const gridColumns = {
       for: 'store:data:sort',
       after: {
         fn: function (ev) {
-          this.brick.options.setSilent("grid.sort", { field: ev.field, dir: ev.dir || 'asc' });
+          this.brick.options.setSilent("table.sort", { field: ev.field, dir: ev.dir || 'asc' });
         }
       }
     }
@@ -82,7 +82,7 @@ export const gridColumns = {
   destroy: function () { },
 
   options: {
-    grid: {
+    table: {
       columns: [
         { datafield: 'code', label: 'Code', sortable: true },
         { datafield: 'name', label: 'Name', sortable: true },
@@ -93,5 +93,5 @@ export const gridColumns = {
 
 
 
-export default gridColumns;
+export default tableColumns;
 

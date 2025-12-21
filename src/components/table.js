@@ -1,22 +1,22 @@
-export const grid = {
-  for: [{ host: 'brick', kind: 'grid' }],
-  requires: ['dom'],
-  ns: 'grid',
+export const table = {
+  for: [{ host: 'brick', kind: 'table' }],
+  requires: ['html'],
+  ns: 'table',
   options: {},
 
   brick: {
     refresh: function () {
-      if (this.__gridExt) this.__gridExt._refreshRows();
+      if (this.__tableExt) this.__tableExt._refreshRows();
     },
     getSelection: function () {
-      const ext = this.__gridExt;
+      const ext = this.__tableExt;
       if (!ext) return { index: -1, row: null };
       const idx = (typeof ext.selectedIndex === 'number') ? ext.selectedIndex : -1;
       const row = (idx >= 0 && ext.rows && ext.rows[idx]) ? ext.rows[idx] : null;
       return { index: idx, row: row };
     },
     clearSelection: function () {
-      if (this.__gridExt) this.__gridExt._setSelectedIndex(-1);
+      if (this.__tableExt) this.__tableExt._setSelectedIndex(-1);
     }
   },
 
@@ -25,15 +25,15 @@ export const grid = {
     rows: [],
     selectedIndex: -1,
     _findTable: function () {
-      const root = this.brick.dom && typeof this.brick.dom.element === 'function'
-        ? this.brick.dom.element()
+      const root = this.brick.html && typeof this.brick.html.element === 'function'
+        ? this.brick.html.element()
         : null;
       if (!root || !root.querySelector) {
         this.table = null;
         return null;
       }
       const table =
-        root.querySelector('table.vb-grid') ||
+        root.querySelector('table.vb-table') ||
         root.querySelector('table');
       this.table = table || null;
       return this.table;
@@ -66,8 +66,8 @@ export const grid = {
       for (let i = 0; i < rows.length; i += 1) {
         const row = rows[i];
         if (!row || !row.classList) continue;
-        if (i === index) row.classList.add('vb-grid-row-selected');
-        else row.classList.remove('vb-grid-row-selected');
+        if (i === index) row.classList.add('selected');
+        else row.classList.remove('selected');
       }
       this.selectedIndex = index;
     }
@@ -116,7 +116,7 @@ export const grid = {
   ],
 
   init: function () {
-    this.brick.__gridExt = this;
+    this.brick.__tableExt = this;
     this.table = null;
     this.rows = [];
     this.selectedIndex = -1;
@@ -128,7 +128,7 @@ export const grid = {
     this.table = null;
     this.selectedIndex = -1;
     if (this.brick) {
-      delete this.brick.__gridExt;
+      delete this.brick.__tableExt;
     }
   }
 };
@@ -137,5 +137,5 @@ export const grid = {
 
 
 
-export default grid;
+export default table;
 

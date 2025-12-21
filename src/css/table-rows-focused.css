@@ -1,4 +1,4 @@
-/* Grid Rows Focus */
+/* Table Rows Focus */
 tr.vb-focused {
     background-color: var(--color-primary-50, #e0f7fa);
     outline: 2px solid var(--color-primary-500, #00bcd4);
@@ -6,6 +6,6 @@ tr.vb-focused {
 }
 
 /* Ensure rows have pointer cursor if selectable */
-.vb[data-kind="grid"] table tbody tr {
+.vb[data-kind="table"] table tbody tr {
     cursor: pointer;
 }

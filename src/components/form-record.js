@@ -1,6 +1,6 @@
 export const formRecord = {
     for: [{ host: 'brick', kind: 'form' }],
-    requires: ['dom', 'store'],
+    requires: ['html', 'store'],
     ns: 'record',
     options: {},
 
@@ -14,7 +14,7 @@ export const formRecord = {
 
     extension: {
         _bind: function (record) {
-            const root = this.brick.dom.element();
+            const root = this.brick.html.element();
             if (!root) return;
 
             // Iterate over all form fields

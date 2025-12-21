@@ -131,7 +131,7 @@
      * Retorna un array amb totes les definicions d'extensions
      * filtrades per host/kind i amb dependències resoltes (topological sort).
      *
-     * @param {Object} brick - Instancia del brick o objecte de metadates {host:'brick', kind:'grid'}
+     * @param {Object} brick - Instancia del brick o objecte de metadates {host:'brick', kind:'table'}
      */
     all: function(brick) {
       if (!brick || typeof brick !== "object") {
@@ -1091,7 +1091,7 @@
       if (kind) {
         opts.kind = kind;
       }
-      opts.dom = {
+      opts.html = {
         id: el.id || null,
         element: el
       };
@@ -1142,15 +1142,14 @@
     }
   }
 
-  // src/extensions/dom-css.js
-  var domCss = {
+  // src/extensions/html-css.js
+  var htmlCss = {
     for: [{ host: "brick", kind: "*" }],
-    requires: ["dom"],
+    requires: ["html"],
     ns: "css",
     options: {},
     brick: {
-      addClass: function(className) {
-        const el = this.dom.element();
+      addClass: function(el, className) {
         if (!el || !className)
           return;
         if (el.classList && el.classList.add) {
@@ -1162,8 +1161,7 @@
           }
         }
       },
-      removeClass: function(className) {
-        const el = this.dom.element();
+      removeClass: function(el, className) {
         if (!el || !className)
           return;
         if (el.classList && el.classList.remove) {
@@ -1173,8 +1171,7 @@
           el.className = (" " + cur + " ").replace(" " + className + " ", " ").trim();
         }
       },
-      hasClass: function(className) {
-        const el = this.dom.element();
+      hasClass: function(el, className) {
         if (!el || !className)
           return false;
         if (el.classList && el.classList.contains)
@@ -1182,8 +1179,7 @@
         const cur = el.className || "";
         return (" " + cur + " ").indexOf(" " + className + " ") !== -1;
       },
-      toggleClass: function(className, force) {
-        const el = this.dom.element();
+      toggleClass: function(el, className, force) {
         if (!el || !className)
           return;
         if (el.classList && typeof el.classList.toggle === "function") {
@@ -1206,41 +1202,35 @@
           }
         }
       },
-      show: function() {
-        const el = this.dom.element();
+      show: function(el) {
         if (!el)
           return;
         el.style.display = "";
       },
-      hide: function() {
-        const el = this.dom.element();
+      hide: function(el) {
         if (!el)
           return;
         el.style.display = "none";
       },
-      setStyle: function(prop, value) {
-        const el = this.dom.element();
+      setStyle: function(el, prop, value) {
         if (!el || !prop)
           return;
         el.style[prop] = value;
       },
-      getStyle: function(prop) {
-        const el = this.dom.element();
+      getStyle: function(el, prop) {
         if (!el || !prop || typeof window === "undefined" || !window.getComputedStyle)
           return null;
         const cs = window.getComputedStyle(el);
         return cs ? cs.getPropertyValue(prop) || cs[prop] : null;
       },
-      setVar: function(name, value) {
-        const el = this.dom.element();
+      setVar: function(el, name, value) {
         if (!el || !name)
           return;
         if (name.indexOf("--") !== 0)
           name = "--" + name;
         el.style.setProperty(name, value);
       },
-      getVar: function(name) {
-        const el = this.dom.element();
+      getVar: function(el, name) {
         if (!el || !name || typeof window === "undefined" || !window.getComputedStyle)
           return null;
         if (name.indexOf("--") !== 0)
@@ -1252,13 +1242,13 @@
     extension: {},
     events: [],
     init: function() {
-      if (!this.brick || !this.brick.dom || typeof this.brick.dom.element !== "function") {
-        console.warn("VanillaBrick domCss requires dom extension active", this.brick && this.brick.id);
+      if (!this.brick || !this.brick.html || typeof this.brick.html.element !== "function") {
+        console.warn("VanillaBrick htmlCss requires html extension active", this.brick && this.brick.id);
         return false;
       }
-      const el = this.brick.dom.element();
+      const el = this.brick.html.element();
       if (!el) {
-        console.warn("VanillaBrick domCss: no DOM element resolved", this.brick && this.brick.id);
+        console.warn("VanillaBrick htmlCss: no DOM element resolved", this.brick && this.brick.id);
         return false;
       }
       return true;
@@ -1266,34 +1256,60 @@
     destroy: function() {
     }
   };
-  var dom_css_default = domCss;
+  var html_css_default = htmlCss;
 
-  // src/extensions/dom-events.js
-  var domEvents = {
+  // src/extensions/html-events.js
+  var htmlEvents = {
     for: [{ host: "brick", kind: "*" }],
-    requires: ["dom"],
-    ns: "dom",
+    requires: ["html"],
+    ns: "html",
     options: {},
-    brick: {},
+    brick: {
+      on: function(el, type, handler, options) {
+        if (!el || typeof el.addEventListener !== "function" || typeof handler !== "function")
+          return;
+        el.addEventListener(type, handler, options);
+        let listeners = this.brick.options.get("html.listeners", []);
+        if (!Array.isArray(listeners))
+          listeners = [];
+        listeners.push({ el, type, handler, options, source: "api" });
+        this.brick.options.setSilent("html.listeners", listeners);
+      },
+      off: function(el, type, handler, options) {
+        if (!el || typeof el.removeEventListener !== "function" || typeof handler !== "function")
+          return;
+        el.removeEventListener(type, handler, options);
+        const listeners = this.brick.options.get("html.listeners", []);
+        if (!Array.isArray(listeners))
+          return;
+        for (let i = listeners.length - 1; i >= 0; i -= 1) {
+          const ln = listeners[i];
+          if (ln.type === type && ln.handler === handler) {
+            listeners.splice(i, 1);
+          }
+        }
+        this.brick.options.setSilent("html.listeners", listeners);
+      }
+    },
     extension: {},
     events: [
       {
         for: "brick:status:ready",
         on: {
           fn: function() {
-            const el = this.brick.dom.element();
+            const el = this.brick.html.element();
             if (!el || typeof el.addEventListener !== "function")
               return;
-            let listeners = this.brick.options.get("dom.events.listeners", []);
+            let listeners = this.brick.options.get("html.events.listeners", []);
             if (!Array.isArray(listeners))
               listeners = [];
             const self = this;
             const defaultMap = [
-              { type: "click", eventName: "dom:mouse:click" },
-              { type: "mouseenter", eventName: "dom:hover:on" },
-              { type: "mouseleave", eventName: "dom:hover:off" },
-              { type: "mousedown", eventName: "dom:mouse:down" },
-              { type: "mouseup", eventName: "dom:mouse:up" }
+              { type: "click", eventName: "html:event:click" },
+              { type: "mouseenter", eventName: "html:event:mouseenter" },
+              { type: "mouseleave", eventName: "html:event:mouseleave" },
+              { type: "mousedown", eventName: "html:event:mousedown" },
+              { type: "mouseup", eventName: "html:event:mouseup" }
             ];
             for (let i = 0; i < defaultMap.length; i += 1) {
               const entry = defaultMap[i];
@@ -1303,10 +1319,8 @@
                   element: el
                 });
               };
-              el.addEventListener(entry.type, handler);
-              listeners.push({ type: entry.type, handler, source: "default" });
+              this.brick.html.on(el, entry.type, handler);
             }
-            this.brick.options.setSilent("dom.events.listeners", listeners);
           }
         }
       },
@@ -1314,17 +1328,16 @@
         for: "brick:status:destroyed",
         before: {
           fn: function() {
-            const el = this.brick && this.brick.dom.element && this.brick.dom.element();
+            const el = this.brick && this.brick.html.element && this.brick.html.element();
             if (!el || typeof el.removeEventListener !== "function")
               return;
-            const listeners = this.brick.options.get("dom.events.listeners", []);
+            const listeners = this.brick.options.get("html.events.listeners", []);
             if (!Array.isArray(listeners))
               return;
             for (let i = 0; i < listeners.length; i += 1) {
               const ln = listeners[i];
-              el.removeEventListener(ln.type, ln.handler, ln.options);
+              this.brick.html.off(el, ln.type, ln.handler, ln.options);
             }
-            this.brick.options.setSilent("dom.events.listeners", []);
           }
         }
       }
@@ -1334,35 +1347,198 @@
     destroy: function() {
     }
   };
-  var dom_events_default = domEvents;
+  var html_events_default = htmlEvents;
 
-  // src/extensions/dom.js
-  var dom = {
+  // src/extensions/html-render.js
+  var htmlRender = {
+    for: [{ host: "brick", kind: "*" }],
+    requires: ["html"],
+    ns: "html",
+    options: {},
+    brick: {
+      // Safe getters/creators
+      get: function(selectorOrTag) {
+        if (!selectorOrTag)
+          return null;
+        const root = this.html && typeof this.html.element === "function" ? this.html.element() : null;
+        if (!root || !root.querySelector)
+          return null;
+        if (selectorOrTag.toLowerCase && root.tagName && selectorOrTag.toLowerCase() === root.tagName.toLowerCase()) {
+          return root;
+        }
+        return root.querySelector(selectorOrTag) || null;
+      },
+      create: function(tag, props) {
+        if (!tag || typeof document === "undefined")
+          return null;
+        const el = document.createElement(tag);
+        const cfg = props || {};
+        if (cfg.text !== void 0 && cfg.text !== null) {
+          el.textContent = cfg.text;
+        }
+        if (cfg.html !== void 0 && cfg.html !== null && this.html && typeof this.html.sanitize === "function") {
+          el.innerHTML = this.html.sanitize(String(cfg.html));
+        }
+        if (cfg.attrs && typeof cfg.attrs === "object") {
+          for (const k in cfg.attrs) {
+            if (Object.prototype.hasOwnProperty.call(cfg.attrs, k) && cfg.attrs[k] !== void 0) {
+              el.setAttribute(k, cfg.attrs[k]);
+            }
+          }
+        }
+        if (cfg.classList && Array.isArray(cfg.classList)) {
+          el.classList.add.apply(el.classList, cfg.classList);
+        }
+        if (cfg.dataset && typeof cfg.dataset === "object") {
+          for (const k in cfg.dataset) {
+            if (Object.prototype.hasOwnProperty.call(cfg.dataset, k) && cfg.dataset[k] !== void 0) {
+              el.dataset[k] = cfg.dataset[k];
+            }
+          }
+        }
+        return el;
+      },
+      frag: function() {
+        return typeof document !== "undefined" && document.createDocumentFragment ? document.createDocumentFragment() : null;
+      },
+      append: function(target, nodeOrFrag) {
+        if (!target || !nodeOrFrag || !target.appendChild)
+          return;
+        target.appendChild(nodeOrFrag);
+      },
+      prepend: function(target, nodeOrFrag) {
+        if (!target || !nodeOrFrag || !target.insertBefore)
+          return;
+        if (!target.firstChild) {
+          target.appendChild(nodeOrFrag);
+        } else {
+          target.insertBefore(nodeOrFrag, target.firstChild);
+        }
+      },
+      replace: function(target, nodeOrFrag) {
+        if (!target || !target.replaceChildren)
+          return;
+        target.replaceChildren(nodeOrFrag);
+      },
+      clear: function(target) {
+        if (!target || !target.replaceChildren)
+          return;
+        target.replaceChildren();
+      },
+      setSafe: function(el, htmlString) {
+        if (!el)
+          return;
+        if (!htmlString) {
+          el.innerHTML = "";
+          return;
+        }
+        if (this.html && typeof this.html.sanitize === "function") {
+          el.innerHTML = this.html.sanitize(String(htmlString));
+        } else {
+          el.textContent = String(htmlString);
+        }
+      },
+      sanitize: function(htmlString) {
+        if (!htmlString)
+          return "";
+        if (typeof DOMParser === "undefined") {
+          return String(htmlString).replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
+        }
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(String(htmlString), "text/html");
+        const scripts = doc.querySelectorAll("script, style, iframe, object, embed");
+        scripts.forEach(function(node) {
+          if (node && node.parentNode)
+            node.parentNode.removeChild(node);
+        });
+        const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT, null);
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          const attrs = Array.prototype.slice.call(node.attributes || []);
+          for (let i = 0; i < attrs.length; i++) {
+            const a = attrs[i];
+            const name = a.name.toLowerCase();
+            const val = a.value || "";
+            if (name.startsWith("on")) {
+              node.removeAttribute(a.name);
+              continue;
+            }
+            if ((name === "href" || name === "src") && /^javascript:/i.test(val)) {
+              node.removeAttribute(a.name);
+            }
+          }
+        }
+        return doc.body.innerHTML || "";
+      },
+      // Render helpers
+      queueRender: function(fn) {
+        if (typeof fn !== "function")
+          return;
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(fn);
+        } else {
+          setTimeout(fn, 0);
+        }
+      },
+      batch: function(items, chunkSize, renderChunk) {
+        const arr = Array.isArray(items) ? items : [];
+        const size = typeof chunkSize === "number" && chunkSize > 0 ? chunkSize : 100;
+        const render = typeof renderChunk === "function" ? renderChunk : null;
+        if (!render)
+          return Promise.resolve();
+        let index = 0;
+        return new Promise((resolve) => {
+          const step = () => {
+            const slice = arr.slice(index, index + size);
+            if (slice.length) {
+              render(slice, index);
+              index += size;
+              this.queueRender(step.bind(this));
+            } else {
+              resolve();
+            }
+          };
+          step();
+        });
+      }
+    },
+    extension: {},
+    events: [],
+    init: function() {
+      return true;
+    },
+    destroy: function() {
+    }
+  };
+  var html_render_default = htmlRender;
+
+  // src/extensions/html.js
+  var html = {
     for: [{ host: "brick", kind: "*" }],
     requires: [],
-    ns: "dom",
+    ns: "html",
     options: {},
     brick: {
       element: function() {
-        return this.options.get("dom.element", null);
+        return this.options.get("html.element", null);
       },
       on: function(type, handler, options) {
-        const el = this.options.get("dom.element", null);
+        const el = this.options.get("html.element", null);
         if (!el || typeof el.addEventListener !== "function" || typeof handler !== "function")
           return;
         el.addEventListener(type, handler, options);
-        let listeners = this.options.get("dom.listeners", []);
+        let listeners = this.options.get("html.listeners", []);
         if (!Array.isArray(listeners))
           listeners = [];
         listeners.push({ type, handler, options, source: "api" });
-        this.options.setSilent("dom.listeners", listeners);
+        this.options.setSilent("html.listeners", listeners);
       },
       off: function(type, handler, options) {
-        const el = this.options.get("dom.element", null);
+        const el = this.options.get("html.element", null);
         if (!el || typeof el.removeEventListener !== "function" || typeof handler !== "function")
           return;
         el.removeEventListener(type, handler, options);
-        const listeners = this.options.get("dom.listeners", []);
+        const listeners = this.options.get("html.listeners", []);
         if (!Array.isArray(listeners))
           return;
         for (let i = listeners.length - 1; i >= 0; i -= 1) {
@@ -1371,7 +1547,7 @@
             listeners.splice(i, 1);
           }
         }
-        this.options.setSilent("dom.listeners", listeners);
+        this.options.setSilent("html.listeners", listeners);
       }
     },
     extension: {
@@ -1403,25 +1579,25 @@
     init: function() {
       if (!this.brick)
         return false;
-      const elemOpt = this.brick.options.get("dom.element", null);
-      const idOpt = this.brick.options.get("dom.id", null);
+      const elemOpt = this.brick.options.get("html.element", null);
+      const idOpt = this.brick.options.get("html.id", null);
       let el = this._resolveElement(elemOpt);
       if (!el && idOpt) {
         el = this._resolveById(idOpt);
       }
       if (!el) {
-        console.warn("VanillaBrick dom extension requires a DOM element (options.dom.element) or a valid options.dom.id", this.brick.id);
+        console.warn("VanillaBrick html extension requires a DOM element (options.html.element) or a valid options.html.id", this.brick.id);
         return false;
       }
       if (elemOpt && !this._resolveElement(elemOpt)) {
-        console.warn("VanillaBrick dom element must be a DOM node or factory, not an id. Use options.dom.id to resolve by id.", this.brick.id);
+        console.warn("VanillaBrick html element must be a DOM node or factory, not an id. Use options.html.id to resolve by id.", this.brick.id);
       }
-      this.brick.options.set("dom.element", el);
+      this.brick.options.set("html.element", el);
       return true;
     },
     destroy: function() {
-      const el = this.brick.options.get("dom.element", null);
-      const listeners = this.brick.options.get("dom.listeners", null);
+      const el = this.brick.options.get("html.element", null);
+      const listeners = this.brick.options.get("html.listeners", null);
       ;
       if (el && Array.isArray(listeners)) {
         for (let i = 0; i < listeners.length; i += 1) {
@@ -1433,7 +1609,7 @@
       }
     }
   };
-  var dom_default = dom;
+  var html_default = html;
 
   // src/extensions/store.js
   var DATA_SAMPLE_ROWS = [
@@ -1461,7 +1637,7 @@
   var store = {
     for: [
       { host: "brick", kind: "form" },
-      { host: "brick", kind: "grid" }
+      { host: "brick", kind: "table" }
     ],
     requires: [],
     ns: "store",
@@ -1733,7 +1909,7 @@
   // src/components/form-items.js
   var formItems = {
     for: [{ host: "brick", kind: "form" }],
-    requires: ["dom"],
+    requires: ["html"],
     ns: "items",
     options: {},
     brick: {
@@ -1743,7 +1919,7 @@
     },
     extension: {
       _parseFromDom: function() {
-        const root = this.brick.dom.element();
+        const root = this.brick.html.element();
         if (!root)
           return [];
         const items = [];
@@ -1793,7 +1969,7 @@
         return 12;
       },
       _render: function(items) {
-        const root = this.brick.dom.element();
+        const root = this.brick.html.element();
         if (!root)
           return;
         root.innerHTML = "";
@@ -1858,7 +2034,7 @@
               items = this.brick.options.get("form.items");
             }
             if (!items || items.length === 0) {
-              const root = this.brick.dom.element();
+              const root = this.brick.html.element();
               if (root) {
                 const configVar = root.getAttribute("brick-form-items") || root.getAttribute("data-form-items");
                 if (configVar && window[configVar]) {
@@ -1900,7 +2076,7 @@
   // src/components/form-record.js
   var formRecord = {
     for: [{ host: "brick", kind: "form" }],
-    requires: ["dom", "store"],
+    requires: ["html", "store"],
     ns: "record",
     options: {},
     brick: {
@@ -1912,7 +2088,7 @@
     },
     extension: {
       _bind: function(record) {
-        const root = this.brick.dom.element();
+        const root = this.brick.html.element();
         if (!root)
           return;
         const inputs = root.querySelectorAll("input, select, textarea");
@@ -1975,7 +2151,7 @@
   // src/components/form.js
   var form = {
     for: [{ host: "brick", kind: "form" }],
-    requires: ["dom"],
+    requires: ["html"],
     ns: "form",
     options: {
       items: []
@@ -2014,21 +2190,48 @@
   };
   var form_default = form;
 
-  // src/components/grid-columns.js
-  var gridColumns = {
-    for: [{ host: "brick", kind: "grid" }],
-    requires: ["dom", "store"],
+  // src/components/status-bar.js
+  var statusBar = {
+    for: [{ host: "brick", kind: "status-bar" }],
+    requires: ["html"],
+    ns: "statusBar",
+    events: [
+      {
+        for: "dom:row:focus",
+        after: {
+          fn: function(ev) {
+            const record = ev.data.row;
+            const el = this.brick.html.element();
+            if (el) {
+              el.textContent = `Wire OK -> Selected: ${record.name}`;
+            }
+          }
+        }
+      }
+    ],
+    init: function() {
+      const el = this.brick.html.element();
+      if (el)
+        el.textContent = "Wire status: Waiting for table...";
+    }
+  };
+  var status_bar_default = statusBar;
+
+  // src/components/table-columns.js
+  var tableColumns = {
+    for: [{ host: "brick", kind: "table" }],
+    requires: ["html", "store"],
     ns: "columns",
     brick: {
       get: function() {
-        return this.options.get("grid.columns", []);
+        return this.options.get("table.columns", []);
       },
       sort: function(field, dir) {
         const cols = this.brick.columns.get();
         const colDef = cols.find(function(c) {
           return c && c.datafield === field;
         }) || {};
-        const state = this.options.get("grid.sort", { field: null, dir: null });
+        const state = this.options.get("table.sort", { field: null, dir: null });
         let nextDir = dir;
         if (nextDir !== "asc" && nextDir !== "desc") {
           nextDir = state.field === field && state.dir === "asc" ? "desc" : "asc";
@@ -2048,15 +2251,15 @@
         on: {
           fn: function() {
             const columns = this.brick.columns.get();
-            const root = this.brick.dom.element && this.brick.dom.element();
+            const root = this.brick.html.element && this.brick.html.element();
             if (!root)
               return;
-            const table = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector && root.querySelector("table");
-            if (!table)
+            const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector && root.querySelector("table");
+            if (!table2)
               return;
-            let thead = table.tHead ? table.tHead : table.querySelector("thead");
+            let thead = table2.tHead ? table2.tHead : table2.querySelector("thead");
             if (!thead) {
-              thead = table.createTHead ? table.createTHead() : table.insertBefore(document.createElement("thead"), table.firstChild);
+              thead = table2.createTHead ? table2.createTHead() : table2.insertBefore(document.createElement("thead"), table2.firstChild);
             }
             const row = thead.rows && thead.rows[0] ? thead.rows[0] : thead.insertRow();
             row.innerHTML = "";
@@ -2082,7 +2285,7 @@
         for: "store:data:sort",
         after: {
           fn: function(ev) {
-            this.brick.options.setSilent("grid.sort", { field: ev.field, dir: ev.dir || "asc" });
+            this.brick.options.setSilent("table.sort", { field: ev.field, dir: ev.dir || "asc" });
           }
         }
       }
@@ -2092,7 +2295,7 @@
     destroy: function() {
     },
     options: {
-      grid: {
+      table: {
         columns: [
           { datafield: "code", label: "Code", sortable: true },
           { datafield: "name", label: "Name", sortable: true }
@@ -2100,18 +2303,18 @@
       }
     }
   };
-  var grid_columns_default = gridColumns;
+  var table_columns_default = tableColumns;
 
-  // src/components/grid-rows-focused.js
-  var gridRowsFocused = {
-    for: [{ host: "brick", kind: "grid" }],
-    requires: ["dom", "rows", "store"],
+  // src/components/table-rows-focused.js
+  var tableRowsFocused = {
+    for: [{ host: "brick", kind: "table" }],
+    requires: ["html", "rows", "store"],
     ns: "rowsFocused",
     options: {},
     brick: {},
     extension: {
       _addTabIndex: function() {
-        const el = this.brick.dom.element();
+        const el = this.brick.html.element();
         if (!el)
           return;
         const rows = el.querySelectorAll("tbody tr") || [];
@@ -2123,7 +2326,7 @@
         }
       },
       _handleFocus: function(target) {
-        const el = this.brick.dom.element();
+        const el = this.brick.html.element();
         if (!el)
           return;
         const row = target.closest("tr");
@@ -2147,7 +2350,7 @@
         for: "brick:status:ready",
         on: {
           fn: function() {
-            const el = this.brick.dom.element();
+            const el = this.brick.html.element();
             if (el) {
               const self = this;
               el.addEventListener("focusin", function(e) {
@@ -2189,28 +2392,28 @@
     destroy: function() {
     }
   };
-  var grid_rows_focused_default = gridRowsFocused;
+  var table_rows_focused_default = tableRowsFocused;
 
-  // src/components/grid-rows.js
-  var gridRows = {
-    for: [{ host: "brick", kind: "grid" }],
-    requires: ["dom", "store", "columns"],
+  // src/components/table-rows.js
+  var tableRows = {
+    for: [{ host: "brick", kind: "table" }],
+    requires: ["html", "store", "columns"],
     ns: "rows",
     options: {},
     brick: {
       render: function() {
-        const root = this.brick.dom.element();
+        const root = this.brick.html.element();
         if (!root)
           return;
-        const table = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector && root.querySelector("table");
-        if (!table)
+        const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector && root.querySelector("table");
+        if (!table2)
           return;
         const columns = this.brick.columns.get();
         const rows = this.brick.store.load();
-        let tbody = table.tBodies && table.tBodies.length ? table.tBodies[0] : table.querySelector("tbody");
+        let tbody = table2.tBodies && table2.tBodies.length ? table2.tBodies[0] : table2.querySelector("tbody");
         if (!tbody) {
           tbody = document.createElement("tbody");
-          table.appendChild(tbody);
+          table2.appendChild(tbody);
         }
         tbody.innerHTML = "";
         for (let r = 0; r < rows.length; r += 1) {
@@ -2251,21 +2454,21 @@
     destroy: function() {
     }
   };
-  var grid_rows_default = gridRows;
+  var table_rows_default = tableRows;
 
-  // src/components/grid.js
-  var grid = {
-    for: [{ host: "brick", kind: "grid" }],
-    requires: ["dom"],
-    ns: "grid",
+  // src/components/table.js
+  var table = {
+    for: [{ host: "brick", kind: "table" }],
+    requires: ["html"],
+    ns: "table",
     options: {},
     brick: {
       refresh: function() {
-        if (this.__gridExt)
-          this.__gridExt._refreshRows();
+        if (this.__tableExt)
+          this.__tableExt._refreshRows();
       },
       getSelection: function() {
-        const ext = this.__gridExt;
+        const ext = this.__tableExt;
         if (!ext)
           return { index: -1, row: null };
         const idx = typeof ext.selectedIndex === "number" ? ext.selectedIndex : -1;
@@ -2273,8 +2476,8 @@
         return { index: idx, row };
       },
       clearSelection: function() {
-        if (this.__gridExt)
-          this.__gridExt._setSelectedIndex(-1);
+        if (this.__tableExt)
+          this.__tableExt._setSelectedIndex(-1);
       }
     },
     extension: {
@@ -2282,24 +2485,24 @@
       rows: [],
       selectedIndex: -1,
       _findTable: function() {
-        const root = this.brick.dom && typeof this.brick.dom.element === "function" ? this.brick.dom.element() : null;
+        const root = this.brick.html && typeof this.brick.html.element === "function" ? this.brick.html.element() : null;
         if (!root || !root.querySelector) {
           this.table = null;
           return null;
         }
-        const table = root.querySelector("table.vb-grid") || root.querySelector("table");
-        this.table = table || null;
+        const table2 = root.querySelector("table.vb-table") || root.querySelector("table");
+        this.table = table2 || null;
         return this.table;
       },
       _refreshRows: function() {
-        const table = this.table || this._findTable();
-        if (!table) {
+        const table2 = this.table || this._findTable();
+        if (!table2) {
           this.rows = [];
           this.selectedIndex = -1;
           return;
         }
-        const body = table.tBodies && table.tBodies.length ? table.tBodies[0] : table.querySelector("tbody");
-        const rows = body ? body.rows : table.rows;
+        const body = table2.tBodies && table2.tBodies.length ? table2.tBodies[0] : table2.querySelector("tbody");
+        const rows = body ? body.rows : table2.rows;
         this.rows = Array.prototype.slice.call(rows || []);
         if (this.selectedIndex >= this.rows.length) {
           this.selectedIndex = -1;
@@ -2319,9 +2522,9 @@
           if (!row || !row.classList)
             continue;
           if (i === index)
-            row.classList.add("vb-grid-row-selected");
+            row.classList.add("selected");
           else
-            row.classList.remove("vb-grid-row-selected");
+            row.classList.remove("selected");
         }
         this.selectedIndex = index;
       }
@@ -2340,8 +2543,8 @@
         for: "dom:click:*",
         on: {
           fn: function(ev) {
-            const table = this.table || this._findTable();
-            if (!table)
+            const table2 = this.table || this._findTable();
+            if (!table2)
               return;
             if (!ev || !ev.data || !ev.data.domEvent)
               return;
@@ -2350,7 +2553,7 @@
               return;
             let node = target;
             let clickedRow = null;
-            while (node && node !== table) {
+            while (node && node !== table2) {
               if (node.tagName && node.tagName.toLowerCase() === "tr") {
                 clickedRow = node;
                 break;
@@ -2373,7 +2576,7 @@
       }
     ],
     init: function() {
-      this.brick.__gridExt = this;
+      this.brick.__tableExt = this;
       this.table = null;
       this.rows = [];
       this.selectedIndex = -1;
@@ -2384,38 +2587,11 @@
       this.table = null;
       this.selectedIndex = -1;
       if (this.brick) {
-        delete this.brick.__gridExt;
+        delete this.brick.__tableExt;
       }
     }
   };
-  var grid_default = grid;
-
-  // src/components/status-bar.js
-  var statusBar = {
-    for: [{ host: "brick", kind: "status-bar" }],
-    requires: ["dom"],
-    ns: "statusBar",
-    events: [
-      {
-        for: "dom:row:focus",
-        after: {
-          fn: function(ev) {
-            const record = ev.data.row;
-            const el = this.brick.dom.element();
-            if (el) {
-              el.textContent = `Wire OK -> Selected: ${record.name}`;
-            }
-          }
-        }
-      }
-    ],
-    init: function() {
-      const el = this.brick.dom.element();
-      if (el)
-        el.textContent = "Wire status: Waiting for grid...";
-    }
-  };
-  var status_bar_default = statusBar;
+  var table_default = table;
 
   // src/services/wire.js
   var WireService = {
@@ -2425,14 +2601,17 @@
 
   // src/_manifest.js
   function registerBuiltins(VanillaBrick2) {
-    if (dom_css_default) {
-      VanillaBrick2.extensions["domCss"] = dom_css_default;
+    if (html_css_default) {
+      VanillaBrick2.extensions["htmlCss"] = html_css_default;
     }
-    if (dom_events_default) {
-      VanillaBrick2.extensions["domEvents"] = dom_events_default;
+    if (html_events_default) {
+      VanillaBrick2.extensions["htmlEvents"] = html_events_default;
     }
-    if (dom_default) {
-      VanillaBrick2.extensions["dom"] = dom_default;
+    if (html_render_default) {
+      VanillaBrick2.extensions["htmlRender"] = html_render_default;
+    }
+    if (html_default) {
+      VanillaBrick2.extensions["html"] = html_default;
     }
     if (store_default) {
       VanillaBrick2.extensions["store"] = store_default;
@@ -2452,20 +2631,20 @@
     if (form_default) {
       VanillaBrick2.extensions["form"] = form_default;
     }
-    if (grid_columns_default) {
-      VanillaBrick2.extensions["gridColumns"] = grid_columns_default;
-    }
-    if (grid_rows_focused_default) {
-      VanillaBrick2.extensions["gridRowsFocused"] = grid_rows_focused_default;
-    }
-    if (grid_rows_default) {
-      VanillaBrick2.extensions["gridRows"] = grid_rows_default;
-    }
-    if (grid_default) {
-      VanillaBrick2.extensions["grid"] = grid_default;
-    }
     if (status_bar_default) {
       VanillaBrick2.extensions["statusBar"] = status_bar_default;
+    }
+    if (table_columns_default) {
+      VanillaBrick2.extensions["tableColumns"] = table_columns_default;
+    }
+    if (table_rows_focused_default) {
+      VanillaBrick2.extensions["tableRowsFocused"] = table_rows_focused_default;
+    }
+    if (table_rows_default) {
+      VanillaBrick2.extensions["tableRows"] = table_rows_default;
+    }
+    if (table_default) {
+      VanillaBrick2.extensions["table"] = table_default;
     }
     VanillaBrick2.services["WireService"] = wire_default;
   }

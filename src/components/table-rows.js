@@ -1,12 +1,12 @@
-export const gridRows = {
-  for: [{ host: 'brick', kind: 'grid' }],
-  requires: ['dom', 'store', 'columns'],
+export const tableRows = {
+  for: [{ host: 'brick', kind: 'table' }],
+  requires: ['html', 'store', 'columns'],
   ns: 'rows',
   options: {},
 
   brick: {
     render: function () {
-      const root = this.brick.dom.element();
+      const root = this.brick.html.element();
       if (!root) return;
 
       const table = root.tagName && root.tagName.toLowerCase() === 'table'
@@ -69,6 +69,5 @@ export const gridRows = {
   destroy: function () { }
 };
 
-
-export default gridRows;
+export default tableRows;
 

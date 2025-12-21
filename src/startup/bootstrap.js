@@ -67,8 +67,8 @@ export function setupBootstrap(VanillaBrick) {
       opts.kind = kind;
     }
 
-    // NESTED: tot el que és de DOM sota dom.{}
-    opts.dom = {
+    // NESTED: tot el que és de DOM sota html.{}
+    opts.html = {
       id: el.id || null,
       element: el
     };

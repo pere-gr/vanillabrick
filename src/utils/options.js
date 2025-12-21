@@ -36,7 +36,7 @@ export function mergeOptions() {
 }
 
 /**
- * Gets a value from an object using dot notation path (e.g. "grid.columns.0.width")
+ * Gets a value from an object using dot notation path (e.g. "table.columns.0.width")
  */
 export function getOption(obj, path) {
   if (!obj || !path) return undefined;

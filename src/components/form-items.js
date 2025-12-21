@@ -1,6 +1,6 @@
 export const formItems = {
     for: [{ host: 'brick', kind: 'form' }],
-    requires: ['dom'],
+    requires: ['html'],
     ns: 'items',
     options: {},
 
@@ -12,7 +12,7 @@ export const formItems = {
 
     extension: {
         _parseFromDom: function () {
-            const root = this.brick.dom.element();
+            const root = this.brick.html.element();
             if (!root) return [];
 
             const items = [];
@@ -66,7 +66,7 @@ export const formItems = {
         },
 
         _render: function (items) {
-            const root = this.brick.dom.element();
+            const root = this.brick.html.element();
             if (!root) return;
 
             // Always clear existing content when rendering from items list
@@ -148,7 +148,7 @@ export const formItems = {
 
                     if (!items || items.length === 0) {
                         // Try to parse from global variable defined in attribute
-                        const root = this.brick.dom.element();
+                        const root = this.brick.html.element();
                         if (root) {
                             const configVar = root.getAttribute('brick-form-items') || root.getAttribute('data-form-items');
                             if (configVar && window[configVar]) {

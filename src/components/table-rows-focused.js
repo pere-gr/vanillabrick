@@ -1,6 +1,6 @@
-export const gridRowsFocused = {
-    for: [{ host: 'brick', kind: 'grid' }],
-    requires: ['dom', 'rows', 'store'],
+export const tableRowsFocused = {
+    for: [{ host: 'brick', kind: 'table' }],
+    requires: ['html', 'rows', 'store'],
     ns: 'rowsFocused',
     options: {},
 
@@ -8,7 +8,7 @@ export const gridRowsFocused = {
 
     extension: {
         _addTabIndex: function () {
-            const el = this.brick.dom.element();
+            const el = this.brick.html.element();
             if (!el) return;
             const rows = el.querySelectorAll('tbody tr') || [];
             for (let i = 0; i < rows.length; i++) {
@@ -19,7 +19,7 @@ export const gridRowsFocused = {
             }
         },
         _handleFocus: function (target) {
-            const el = this.brick.dom.element();
+            const el = this.brick.html.element();
             if (!el) return;
             const row = target.closest('tr');
             if (!row) return;
@@ -41,7 +41,7 @@ export const gridRowsFocused = {
             for: 'brick:status:ready',
             on: {
                 fn: function () {
-                    const el = this.brick.dom.element();
+                    const el = this.brick.html.element();
                     if (el) {
                         const self = this;
                         el.addEventListener('focusin', function (e) {
@@ -84,6 +84,5 @@ export const gridRowsFocused = {
     destroy: function () { }
 };
 
-
-export default gridRowsFocused;
+export default tableRowsFocused;
 
