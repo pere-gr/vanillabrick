@@ -32,38 +32,54 @@ export const tableColumns = {
     {
       for: 'brick:status:ready',
       on: {
-        fn: function () {
+        fn: function (ev) {
           const columns = this.brick.columns.get();
-          const root = this.brick.html.element && this.brick.html.element();
+          const html = this.brick.html;
+          const root = html.element && html.element();
           if (!root) return;
 
           const table = root.tagName && root.tagName.toLowerCase() === 'table'
             ? root
-            : root.querySelector && root.querySelector('table');
+            : (html.get && html.get('table')) || (root.querySelector && root.querySelector('table'));
           if (!table) return;
 
-          let thead = (table.tHead) ? table.tHead : table.querySelector('thead');
-          if (!thead) {
-            thead = table.createTHead ? table.createTHead() : table.insertBefore(document.createElement('thead'), table.firstChild);
-          }
-
-          const row = thead.rows && thead.rows[0] ? thead.rows[0] : thead.insertRow();
-          row.innerHTML = '';
+          // Build thead in-memory; attach in 'after'
+          const thead = html.create('thead');
+          const row = thead.insertRow();
           const brick = this.brick;
+
           for (let i = 0; i < columns.length; i += 1) {
             const col = columns[i] || {};
-            const th = document.createElement('th');
-            th.textContent = col.label || col.datafield || '';
+            const th = html.create('th', { text: col.label || col.datafield || '' });
             if (col.sortable && col.datafield) {
               th.classList.add('vb-sortable');
-              th.addEventListener('click', (function (colDef) {
+              html.on(th, 'click', (function (colDef) {
                 return function () {
                   brick.columns.sort(colDef.datafield, null);
                 };
               })(col));
             }
-            row.appendChild(th);
+            html.append(row, th);
           }
+
+          // Pass along to after phase
+          if (!ev.data) ev.data = {};
+          ev.data.table = table;
+          ev.data.thead = thead;
+        }
+      },
+      after: {
+        fn: function (ev) {
+          const html = this.brick.html;
+          const table = (ev && ev.data && ev.data.table) || (html.get && html.get('table')) || null;
+          const thead = ev && ev.data && ev.data.thead;
+          if (!table || !thead) return;
+
+          const existing = table.tHead || table.querySelector && table.querySelector('thead');
+          if (existing && existing !== thead && existing.parentNode === table) {
+            table.removeChild(existing);
+          }
+          table.insertBefore(thead, table.firstChild || null);
         }
       }
     },
@@ -86,6 +102,7 @@ export const tableColumns = {
       columns: [
         { datafield: 'code', label: 'Code', sortable: true },
         { datafield: 'name', label: 'Name', sortable: true },
+        { datafield: 'key', label: 'Key', sortable: false },
       ]
     }
   }

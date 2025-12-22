@@ -7,7 +7,7 @@ export const tableRowsFocused = {
     brick: {},
 
     extension: {
-        _addTabIndex: function () {
+       /* _addTabIndex: function () {
             const el = this.brick.html.element();
             if (!el) return;
             const rows = el.querySelectorAll('tbody tr') || [];
@@ -33,50 +33,35 @@ export const tableRowsFocused = {
                 row: data,
                 element: row
             });
-        }
+        }*/
     },
 
     events: [
-        {
-            for: 'brick:status:ready',
-            on: {
-                fn: function () {
-                    const el = this.brick.html.element();
-                    if (el) {
-                        const self = this;
-                        el.addEventListener('focusin', function (e) {
-                            self._handleFocus(e.target);
+            {
+                // Per-row render
+                for: 'table:render:row',
+                before:{
+                    fn: function(ev){
+                        const html = this.brick.html;
+                        const tr = ev.data.tr;
+                        html.off(tr,"mousedown");
+                    }
+                },
+                after:{
+                    fn: function(ev){
+                        const html = this.brick.html;
+                        const tr = ev.data.tr;
+                        html.on(tr,"mousedown",(e)=>{
+                           const root = this.brick.html.element(); // o la table/tbody si tens la ref
+                            root.querySelectorAll("tr.vb-focused").forEach(el => {
+                                if (el !== tr) this.brick.css.removeClass(el, "vb-focused");
+                            });
+                            this.brick.css.addClass(tr, "vb-focused");
+                            this.brick.wire?.notify('dom:row:focus', {row:ev.data.row});
                         });
                     }
-                    this._addTabIndex();
                 }
-            }
-        },
-        {
-            for: 'store:data:set',
-            after: {
-                fn: function (ev) {
-                    this._addTabIndex();
-                }
-            }
-        },
-        {
-            for: 'store:data:sort',
-            after: {
-                fn: function () {
-                    this._addTabIndex();
-                }
-            }
-        },
-        {
-            for: 'dom:row:focus',
-            after: {
-                fn: function (ev) {
-                    this.brick.wire?.notify('dom:row:focus', ev.data);
-                }
-            }
-        }
-
+            },
     ],
 
     init: function () { },

@@ -65,9 +65,9 @@ export const formRecord = {
             for: 'dom:row:focus',
             after: {
                 fn: function (ev) {
-                    console.warn("Form > master focused a row", ev);
+                    //console.warn("Form > master focused a row", ev);
                     const record = ev.data.row;
-                    console.log("\trecord", record);
+                    //console.log("\trecord", record);
                     // We bind the first record
                     this._bind(record);
                 }

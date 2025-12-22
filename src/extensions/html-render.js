@@ -5,6 +5,29 @@ export const htmlRender = {
   options: {},
 
   brick: {
+    attr: function (el, key, value) {
+      if (!el) return el;
+
+      // Permet passar objecte: attr(el, { id:"x", title:"y" })
+      if (key && typeof key === "object") {
+        for (const k in key) attr(el, k, key[k]);
+        return el;
+      }
+
+      if (value === undefined || value === null || value === false) {
+        el.removeAttribute(key);
+        return el;
+      }
+
+      // boolean attribute (checked, disabled, readonly, etc.)
+      if (value === true) {
+        el.setAttribute(key, "");
+        return el;
+      }
+
+      el.setAttribute(key, String(value));
+      return el;
+    },
     // Safe getters/creators
     get: function (selectorOrTag) {
       if (!selectorOrTag) return null;
@@ -67,6 +90,13 @@ export const htmlRender = {
     clear: function (target) {
       if (!target || !target.replaceChildren) return;
       target.replaceChildren();
+    },
+    detach: function (el) {
+      if (!el) return el || null;
+      if (el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+      return el;
     },
     setSafe: function (el, htmlString) {
       if (!el) return;

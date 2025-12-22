@@ -1283,18 +1283,24 @@
         listeners.push({ el, type, handler, options, source: "api" });
         this.brick.options.setSilent("html.listeners", listeners);
       },
-      off: function(el, type, handler, options) {
-        if (!el || typeof el.removeEventListener !== "function" || typeof handler !== "function")
+      off: function(el, type, handler) {
+        if (!el || typeof el.removeEventListener !== "function")
           return;
-        el.removeEventListener(type, handler, options);
         const listeners = this.brick.options.get("html.listeners", []);
-        if (!Array.isArray(listeners))
+        if (!Array.isArray(listeners) || listeners.length === 0)
           return;
-        for (let i = listeners.length - 1; i >= 0; i -= 1) {
+        const hasType = typeof type === "string" && type.length > 0;
+        const hasHandler = typeof handler === "function";
+        for (let i = listeners.length - 1; i >= 0; i--) {
           const ln = listeners[i];
-          if (ln.type === type && ln.handler === handler) {
-            listeners.splice(i, 1);
-          }
+          if (!ln || ln.el !== el)
+            continue;
+          if (hasType && ln.type !== type)
+            continue;
+          if (hasHandler && ln.handler !== handler)
+            continue;
+          el.removeEventListener(ln.type, ln.handler, ln.options);
+          listeners.splice(i, 1);
         }
         this.brick.options.setSilent("html.listeners", listeners);
       }
@@ -1364,6 +1370,25 @@
     ns: "html",
     options: {},
     brick: {
+      attr: function(el, key, value) {
+        if (!el)
+          return el;
+        if (key && typeof key === "object") {
+          for (const k in key)
+            attr(el, k, key[k]);
+          return el;
+        }
+        if (value === void 0 || value === null || value === false) {
+          el.removeAttribute(key);
+          return el;
+        }
+        if (value === true) {
+          el.setAttribute(key, "");
+          return el;
+        }
+        el.setAttribute(key, String(value));
+        return el;
+      },
       // Safe getters/creators
       get: function(selectorOrTag) {
         if (!selectorOrTag)
@@ -1432,6 +1457,14 @@
         if (!target || !target.replaceChildren)
           return;
         target.replaceChildren();
+      },
+      detach: function(el) {
+        if (!el)
+          return el || null;
+        if (el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+        return el;
       },
       setSafe: function(el, htmlString) {
         if (!el)
@@ -1773,9 +1806,6 @@
     options: {},
     brick: {
       notify: function(eventName, data) {
-        console.warn("WireClient > sending notify", eventName, data);
-        console.log("	for event", eventName);
-        console.log("	with payload", data);
         if (!this.ext._service)
           this.ext._connect();
         if (!this.ext._service)
@@ -1787,13 +1817,10 @@
         });
       },
       request: function(eventName, data) {
-        console.warn("request", eventName, data);
-        console.log("this", this);
         if (!this.ext._service)
           this.ext._connect();
         if (!this.ext._service)
           return;
-        console.log("this.service", this.ext._service);
         this.ext._service.events.fire("wire:request:out", {
           from: this.brick.id,
           event: eventName,
@@ -1853,18 +1880,12 @@
         for: "wire:notify:out",
         on: {
           fn: function(ev) {
-            console.warn("WireService > on wire:notify:out", ev);
             const master = ev.data.from;
-            console.log("	from", master);
             const evName = ev.data.event;
-            console.log("	evName", evName);
             const evData = ev.data.data;
-            console.log("	evData", evData);
             const slaves = this.ext._slaves[master];
-            console.log("	for slaves", slaves);
             if (slaves && slaves.length > 0) {
               for (let i = 0; i < slaves.length; i++) {
-                console.log("	- firing", evName, "in", slaves[i].brick.id);
                 slaves[i].brick.events.fire(evName, evData);
               }
             }
@@ -1882,7 +1903,6 @@
     ],
     extension: {
       _register: function(data) {
-        console.warn("register", data.brick, data.options, this);
         if (data.options.master) {
           if (this.ext._bricks == null)
             this.ext._bricks = {};
@@ -1906,9 +1926,6 @@
             this.ext._slaves[data.options.slaveOf[i].id].push({ id: data.brick.id, kind: data.brick.kind, brick: data.brick });
           }
         }
-        console.log("_bricks", this.ext._bricks);
-        console.log("_masters", this.ext._masters);
-        console.log("_slaves", this.ext._slaves);
       }
     }
   };
@@ -1977,40 +1994,37 @@
         return 12;
       },
       _render: function(items) {
-        const root = this.brick.html.element();
+        const html2 = this.brick.html;
+        const root = html2.element();
         if (!root)
           return;
-        root.innerHTML = "";
+        html2.clear(root);
+        const frag = html2.frag() || root.ownerDocument.createDocumentFragment();
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
           if (item.type !== "group")
             continue;
-          const groupEl = document.createElement("div");
-          groupEl.className = "vb-form-group";
-          const rowEl = document.createElement("div");
-          rowEl.className = "vb-row";
+          const groupEl = html2.create("div", { classList: ["vb-form-group"] });
+          const rowEl = html2.create("div", { classList: ["vb-row"] });
           if (item.items && item.items.length) {
             for (let j = 0; j < item.items.length; j++) {
               const field = item.items[j];
               const span = field.span || 12;
-              const colEl = document.createElement("div");
-              colEl.className = "vb-span-" + span;
-              const fieldContainer = document.createElement("div");
-              fieldContainer.className = "vb-form-field";
+              const colEl = html2.create("div", { classList: ["vb-span-" + span] });
+              const fieldContainer = html2.create("div", { classList: ["vb-form-field"] });
               if (field.label) {
-                const label = document.createElement("label");
-                label.textContent = field.label;
+                const label = html2.create("label", { text: field.label });
                 if (field.name)
                   label.htmlFor = field.name;
-                fieldContainer.appendChild(label);
+                html2.append(fieldContainer, label);
               }
               let input;
               if (field.controlType === "textarea") {
-                input = document.createElement("textarea");
+                input = html2.create("textarea");
               } else if (field.controlType === "select") {
-                input = document.createElement("select");
+                input = html2.create("select");
               } else {
-                input = document.createElement("input");
+                input = html2.create("input");
                 input.type = field.inputType || "text";
               }
               if (field.name) {
@@ -2022,14 +2036,15 @@
               if (field.required === true || field.required === "true" || field.required === "required") {
                 input.required = true;
               }
-              fieldContainer.appendChild(input);
-              colEl.appendChild(fieldContainer);
-              rowEl.appendChild(colEl);
+              html2.append(fieldContainer, input);
+              html2.append(colEl, fieldContainer);
+              html2.append(rowEl, colEl);
             }
           }
-          groupEl.appendChild(rowEl);
-          root.appendChild(groupEl);
+          html2.append(groupEl, rowEl);
+          html2.append(frag, groupEl);
         }
+        html2.append(root, frag);
       }
     },
     events: [
@@ -2140,9 +2155,7 @@
         for: "dom:row:focus",
         after: {
           fn: function(ev) {
-            console.warn("Form > master focused a row", ev);
             const record = ev.data.row;
-            console.log("	record", record);
             this._bind(record);
           }
         }
@@ -2257,35 +2270,49 @@
       {
         for: "brick:status:ready",
         on: {
-          fn: function() {
+          fn: function(ev) {
             const columns = this.brick.columns.get();
-            const root = this.brick.html.element && this.brick.html.element();
+            const html2 = this.brick.html;
+            const root = html2.element && html2.element();
             if (!root)
               return;
-            const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector && root.querySelector("table");
+            const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : html2.get && html2.get("table") || root.querySelector && root.querySelector("table");
             if (!table2)
               return;
-            let thead = table2.tHead ? table2.tHead : table2.querySelector("thead");
-            if (!thead) {
-              thead = table2.createTHead ? table2.createTHead() : table2.insertBefore(document.createElement("thead"), table2.firstChild);
-            }
-            const row = thead.rows && thead.rows[0] ? thead.rows[0] : thead.insertRow();
-            row.innerHTML = "";
+            const thead = html2.create("thead");
+            const row = thead.insertRow();
             const brick = this.brick;
             for (let i = 0; i < columns.length; i += 1) {
               const col = columns[i] || {};
-              const th = document.createElement("th");
-              th.textContent = col.label || col.datafield || "";
+              const th = html2.create("th", { text: col.label || col.datafield || "" });
               if (col.sortable && col.datafield) {
                 th.classList.add("vb-sortable");
-                th.addEventListener("click", /* @__PURE__ */ function(colDef) {
+                html2.on(th, "click", /* @__PURE__ */ function(colDef) {
                   return function() {
                     brick.columns.sort(colDef.datafield, null);
                   };
                 }(col));
               }
-              row.appendChild(th);
+              html2.append(row, th);
             }
+            if (!ev.data)
+              ev.data = {};
+            ev.data.table = table2;
+            ev.data.thead = thead;
+          }
+        },
+        after: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            const table2 = ev && ev.data && ev.data.table || html2.get && html2.get("table") || null;
+            const thead = ev && ev.data && ev.data.thead;
+            if (!table2 || !thead)
+              return;
+            const existing = table2.tHead || table2.querySelector && table2.querySelector("thead");
+            if (existing && existing !== thead && existing.parentNode === table2) {
+              table2.removeChild(existing);
+            }
+            table2.insertBefore(thead, table2.firstChild || null);
           }
         }
       },
@@ -2306,7 +2333,8 @@
       table: {
         columns: [
           { datafield: "code", label: "Code", sortable: true },
-          { datafield: "name", label: "Name", sortable: true }
+          { datafield: "name", label: "Name", sortable: true },
+          { datafield: "key", label: "Key", sortable: false }
         ]
       }
     }
@@ -2321,76 +2349,59 @@
     options: {},
     brick: {},
     extension: {
-      _addTabIndex: function() {
-        const el = this.brick.html.element();
-        if (!el)
-          return;
-        const rows = el.querySelectorAll("tbody tr") || [];
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
-          if (!row.hasAttribute("tabindex")) {
-            row.setAttribute("tabindex", i);
-          }
-        }
-      },
-      _handleFocus: function(target) {
-        const el = this.brick.html.element();
-        if (!el)
-          return;
-        const row = target.closest("tr");
-        if (!row)
-          return;
-        const old = el.querySelector("tr.vb-focused");
-        if (old)
-          old.classList.remove("vb-focused");
-        row.classList.add("vb-focused");
-        const rowIndex = Array.prototype.indexOf.call(row.parentNode.children, row);
-        const data = this.brick.store.get(rowIndex);
-        this.brick.events.fire("dom:row:focus", {
-          index: rowIndex,
-          row: data,
-          element: row
-        });
-      }
+      /* _addTabIndex: function () {
+           const el = this.brick.html.element();
+           if (!el) return;
+           const rows = el.querySelectorAll('tbody tr') || [];
+           for (let i = 0; i < rows.length; i++) {
+               const row = rows[i];
+               if (!row.hasAttribute('tabindex')) {
+                   row.setAttribute('tabindex', i);
+               }
+           }
+       },
+       _handleFocus: function (target) {
+           const el = this.brick.html.element();
+           if (!el) return;
+           const row = target.closest('tr');
+           if (!row) return;
+           const old = el.querySelector('tr.vb-focused');
+           if (old) old.classList.remove('vb-focused');
+           row.classList.add('vb-focused');
+           const rowIndex = Array.prototype.indexOf.call(row.parentNode.children, row);
+           const data = this.brick.store.get(rowIndex);
+           this.brick.events.fire('dom:row:focus', {
+               index: rowIndex,
+               row: data,
+               element: row
+           });
+       }*/
     },
     events: [
       {
-        for: "brick:status:ready",
-        on: {
-          fn: function() {
-            const el = this.brick.html.element();
-            if (el) {
-              const self = this;
-              el.addEventListener("focusin", function(e) {
-                self._handleFocus(e.target);
+        // Per-row render
+        for: "table:render:row",
+        before: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            const tr = ev.data.tr;
+            html2.off(tr, "mousedown");
+          }
+        },
+        after: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            const tr = ev.data.tr;
+            html2.on(tr, "mousedown", (e) => {
+              var _a;
+              const root = this.brick.html.element();
+              root.querySelectorAll("tr.vb-focused").forEach((el) => {
+                if (el !== tr)
+                  this.brick.css.removeClass(el, "vb-focused");
               });
-            }
-            this._addTabIndex();
-          }
-        }
-      },
-      {
-        for: "store:data:set",
-        after: {
-          fn: function(ev) {
-            this._addTabIndex();
-          }
-        }
-      },
-      {
-        for: "store:data:sort",
-        after: {
-          fn: function() {
-            this._addTabIndex();
-          }
-        }
-      },
-      {
-        for: "dom:row:focus",
-        after: {
-          fn: function(ev) {
-            var _a;
-            (_a = this.brick.wire) == null ? void 0 : _a.notify("dom:row:focus", ev.data);
+              this.brick.css.addClass(tr, "vb-focused");
+              (_a = this.brick.wire) == null ? void 0 : _a.notify("dom:row:focus", { row: ev.data.row });
+            });
           }
         }
       }
@@ -2410,32 +2421,18 @@
     options: {},
     brick: {
       render: function() {
-        const root = this.brick.html.element();
+        const html2 = this.brick.html;
+        const root = html2.element();
         if (!root)
           return;
-        const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector && root.querySelector("table");
-        if (!table2)
-          return;
-        const columns = this.brick.columns.get();
+        const t0 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
         const rows = this.brick.store.load();
-        let tbody = table2.tBodies && table2.tBodies.length ? table2.tBodies[0] : table2.querySelector("tbody");
-        if (!tbody) {
-          tbody = document.createElement("tbody");
-          table2.appendChild(tbody);
-        }
-        tbody.innerHTML = "";
-        for (let r = 0; r < rows.length; r += 1) {
-          const record = rows[r] || {};
-          const tr = document.createElement("tr");
-          for (let c = 0; c < columns.length; c += 1) {
-            const col = columns[c] || {};
-            const field = col.datafield;
-            const td = document.createElement("td");
-            td.textContent = field && record[field] !== void 0 && record[field] !== null ? record[field] : "";
-            tr.appendChild(td);
-          }
-          tbody.appendChild(tr);
-        }
+        const columns = this.brick.columns.get();
+        this.brick.events.fireAsync("table:render:rows", { rows, columns }).then(() => {
+          const t1 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+          const ms = Math.round(t1 - t0);
+          console.warn("table rows pipeline time", ms, "ms");
+        });
       }
     },
     extension: {},
@@ -2453,6 +2450,155 @@
         after: {
           fn: function(ev) {
             this.brick.rows.render();
+          }
+        }
+      },
+      {
+        // Manage full rows render pipeline
+        for: "table:render:rows",
+        before: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            const root = html2.element && html2.element();
+            if (!root)
+              return;
+            ev.data = ev.data || {};
+            ev.data.rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
+            ev.data.columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
+            const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : html2.get && html2.get("table") || root.querySelector && root.querySelector("table");
+            if (!table2)
+              return;
+            const oldTbody = html2.detach(table2.querySelector("tbody"));
+            const newTbody = html2.create("tbody");
+            ev.data.table = table2;
+            ev.data.oldTbody = oldTbody;
+            ev.data.tbody = newTbody;
+            ev.data.frag = html2.frag() || newTbody.ownerDocument.createDocumentFragment();
+          }
+        },
+        on: {
+          fn: function(ev) {
+            const data = ev.data || {};
+            const rows = Array.isArray(ev && ev.data && ev.data.rows) ? ev.data.rows : this.brick.store.load();
+            const columns = Array.isArray(ev && ev.data && ev.data.columns) ? ev.data.columns : this.brick.columns.get();
+            data.columns = columns;
+            data.rows = rows;
+            for (let i = 0; i < rows.length; i += 1) {
+              const rowData = rows[i] || {};
+              this.brick.events.fire("table:render:row", {
+                row: rowData,
+                rowIndex: i,
+                oldTbody: data.oldTbody,
+                frag: data.frag,
+                tbody: ev.data.tbody,
+                columns
+              });
+            }
+          }
+        },
+        after: {
+          fn: function(ev) {
+            const data = ev.data || {};
+            const html2 = this.brick.html;
+            const tbody = data.tbody;
+            if (!tbody)
+              return;
+            html2.append(data.table, tbody);
+            return;
+            if (data.table) {
+              const table2 = data.table;
+              if (data.oldTbody && data.oldTbody.parentNode === table2) {
+                table2.replaceChild(tbody, data.oldTbody);
+              } else {
+                html2.append(table2, tbody);
+              }
+            }
+          }
+        }
+      },
+      {
+        // Per-row render
+        for: "table:render:row",
+        before: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            let tr = null;
+            const oldTbody = ev.data && ev.data.oldTbody;
+            if (oldTbody && oldTbody.firstChild) {
+              tr = oldTbody.firstChild;
+              oldTbody.removeChild(tr);
+            }
+            if (!tr)
+              tr = html2.create("tr");
+            ev.data.tr = tr;
+          }
+        },
+        on: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            const tr = ev.data.tr;
+            const row = ev.data.row || {};
+            const columns = ev.data.columns || [];
+            html2.attr(tr, "key", row.key);
+            for (let c = 0; c < columns.length; c += 1) {
+              const col = columns[c] || {};
+              this.brick.events.fire("table:render:col", {
+                tr,
+                tdIndex: c,
+                column: col,
+                row,
+                rowIndex: ev.data.rowIndex
+              });
+            }
+          }
+        },
+        after: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            const tr = ev.data.tr;
+            const tbody = ev.data.tbody;
+            if (tbody && tr) {
+              html2.append(tbody, tr);
+            }
+          }
+        }
+      },
+      {
+        // Per-column render
+        for: "table:render:col",
+        before: {
+          fn: function(ev) {
+            const html2 = this.brick.html;
+            const tr = ev.data.tr;
+            const idx = ev.data.tdIndex;
+            if (!tr)
+              return;
+            let td = tr.cells && tr.cells[idx] ? tr.cells[idx] : null;
+            if (!td) {
+              td = html2.create("td");
+              if (tr.cells && idx < tr.cells.length) {
+                tr.insertBefore(td, tr.cells[idx]);
+              } else {
+                html2.append(tr, td);
+              }
+            }
+            ev.data.td = td;
+          }
+        },
+        on: {
+          fn: function(ev) {
+            const td = ev.data.td;
+            const col = ev.data.column || {};
+            const row = ev.data.row || {};
+            const field = col.datafield;
+            const val = field && Object.prototype.hasOwnProperty.call(row, field) ? row[field] : "";
+            if (td) {
+              td.textContent = val === void 0 || val === null ? "" : val;
+            }
+          }
+        },
+        after: {
+          fn: function() {
           }
         }
       }

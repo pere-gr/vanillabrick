@@ -13,18 +13,27 @@ export const htmlEvents = {
       listeners.push({ el: el, type: type, handler: handler, options: options, source: 'api' });
       this.brick.options.setSilent('html.listeners', listeners);
     },
-    off: function (el, type, handler, options) {
-      if (!el || typeof el.removeEventListener !== 'function' || typeof handler !== 'function') return;
-      el.removeEventListener(type, handler, options);
-      const listeners = this.brick.options.get('html.listeners', []);
-      if (!Array.isArray(listeners)) return;
-      for (let i = listeners.length - 1; i >= 0; i -= 1) {
+    off: function (el, type, handler) {
+      if (!el || typeof el.removeEventListener !== "function") return;
+
+      const listeners = this.brick.options.get("html.listeners", []);
+      if (!Array.isArray(listeners) || listeners.length === 0) return;
+
+      const hasType = typeof type === "string" && type.length > 0;
+      const hasHandler = typeof handler === "function";
+
+      for (let i = listeners.length - 1; i >= 0; i--) {
         const ln = listeners[i];
-        if (ln.type === type && ln.handler === handler) {
-          listeners.splice(i, 1);
-        }
+        if (!ln || ln.el !== el) continue;
+        if (hasType && ln.type !== type) continue;
+        if (hasHandler && ln.handler !== handler) continue;
+
+        // IMPORTANT: treu amb els options originals, no els que et passin ara
+        el.removeEventListener(ln.type, ln.handler, ln.options);
+        listeners.splice(i, 1);
       }
-      this.brick.options.setSilent('html.listeners', listeners);
+
+      this.brick.options.setSilent("html.listeners", listeners);
     }
   },
 
