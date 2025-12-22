@@ -1,6 +1,6 @@
 export const statusBar = {
     for: [{ host: 'brick', kind: 'status-bar' }],
-    requires: ['dom'],
+    requires: ['html'],
     ns: 'statusBar',
     events: [
         {
@@ -8,7 +8,7 @@ export const statusBar = {
             after: {
                 fn: function (ev) {
                     const record = ev.data.row;
-                    const el = this.brick.dom.element();
+                    const el = this.brick.html.element();
                     if (el) {
                         el.textContent = `Wire OK -> Selected: ${record.name}`;
                     }
@@ -17,8 +17,8 @@ export const statusBar = {
         }
     ],
     init: function () {
-        const el = this.brick.dom.element();
-        if (el) el.textContent = 'Wire status: Waiting for grid...';
+        const el = this.brick.html.element();
+        if (el) el.textContent = 'Wire status: Waiting for table...';
     }
 };
 

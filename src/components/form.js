@@ -1,6 +1,6 @@
 export const form = {
     for: [{ host: 'brick', kind: 'form' }],
-    requires: ['dom'],
+    requires: ['html'],
     ns: 'form',
     options: {
         items:[],

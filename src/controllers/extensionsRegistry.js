@@ -10,7 +10,7 @@ const ExtensionsRegistry = {
    * Retorna un array amb totes les definicions d'extensions
    * filtrades per host/kind i amb dependències resoltes (topological sort).
    *
-   * @param {Object} brick - Instancia del brick o objecte de metadates {host:'brick', kind:'grid'}
+   * @param {Object} brick - Instancia del brick o objecte de metadates {host:'brick', kind:'table'}
    */
   all: function (brick) {
     if (!brick || typeof brick !== 'object') {
@@ -174,7 +174,7 @@ const ExtensionsRegistry = {
             // We use a closure here to trap 'name' and 'k' correctly
             (function (methodName, methodFn, extName) {
               protoApi[methodName] = function () {
-                // This function will be called on the namespace object (e.g. brick.grid.refresh())
+                // This function will be called on the namespace object (e.g. brick.table.refresh())
                 // We need to find the specific context for this extension instance
 
                 // 'this' is the namespace object (brick[ns])

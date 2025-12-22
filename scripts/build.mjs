@@ -1,5 +1,5 @@
 import * as esbuild from 'esbuild';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, basename, extname } from 'path';
 
 const outDir = 'dist';
@@ -105,6 +105,31 @@ async function build() {
             outfile: join(outDir, 'vanillabrick.esm.js'),
         });
         console.log(`Build complete: ${join(outDir, 'vanillabrick.esm.js')}`);
+
+        // 4. CSS bundle (concat all css files in src/css)
+        const cssDir = 'src/css';
+        if (existsSync(cssDir)) {
+            const cssFiles = readdirSync(cssDir)
+                .filter(f => f.endsWith('.css') && !f.startsWith('_'))
+                .sort();
+
+            if (cssFiles.length) {
+                const cssContent = cssFiles
+                    .map(f => readFileSync(join(cssDir, f), 'utf8'))
+                    .join('\n');
+
+                // Write non-minified
+                writeFileSync(join(outDir, 'vanillabrick.css'), cssContent);
+
+                // Minify via esbuild transform
+                const minified = await esbuild.transform(cssContent, { loader: 'css', minify: true });
+                writeFileSync(join(outDir, 'vanillabrick.min.css'), minified.code);
+
+                console.log('CSS built:', join(outDir, 'vanillabrick.css'), join(outDir, 'vanillabrick.min.css'));
+            } else {
+                console.warn('No CSS files found in', cssDir);
+            }
+        }
 
     } catch (e) {
         console.error('Build failed', e);

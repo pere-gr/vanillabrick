@@ -24,7 +24,7 @@ const DATA_SAMPLE_ROWS = [
 export const store = {
   for: [
     { host: 'brick', kind: 'form' },
-    { host: 'brick', kind: 'grid' }
+    { host: 'brick', kind: 'table' }
   ],
   requires: [],
   ns: 'store',

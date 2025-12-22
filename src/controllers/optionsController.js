@@ -20,6 +20,28 @@ OptionsController.prototype.init = function (brick, initialOptions) {
     data: initialOptions || {},
     cache: {}
   };
+
+    // Create public API
+  const self = this;
+  brick.options = {
+    get: function (key, fallback) {
+      return  self.get(brick, key, fallback); 
+    },
+    set: function(key, value) {
+      self.setSync(brick, key, value);
+      return brick;
+    },
+    setAsync: async function(key, value)  {
+      await self.setAsync(brick, key, value);
+      return brick;
+    },
+    has: function(key) { return self.has(brick, key)} ,
+    all: function()  {self.all(brick)},
+    setSilent:function (key, value)  {
+      self.setSilent(brick, key, value);
+      return brick;
+    }
+  };
 };
 
 /**

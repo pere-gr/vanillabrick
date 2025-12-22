@@ -1,6 +1,6 @@
 export const formItems = {
     for: [{ host: 'brick', kind: 'form' }],
-    requires: ['dom'],
+    requires: ['html'],
     ns: 'items',
     options: {},
 
@@ -12,7 +12,7 @@ export const formItems = {
 
     extension: {
         _parseFromDom: function () {
-            const root = this.brick.dom.element();
+            const root = this.brick.html.element();
             if (!root) return [];
 
             const items = [];
@@ -66,47 +66,45 @@ export const formItems = {
         },
 
         _render: function (items) {
-            const root = this.brick.dom.element();
+            const html = this.brick.html;
+            const root = html.element();
             if (!root) return;
 
             // Always clear existing content when rendering from items list
-            root.innerHTML = '';
+            html.clear(root);
+
+            const frag = html.frag() || root.ownerDocument.createDocumentFragment();
 
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 if (item.type !== 'group') continue;
 
-                const groupEl = document.createElement('div');
-                groupEl.className = 'vb-form-group';
+                const groupEl = html.create('div', { classList: ['vb-form-group'] });
 
-                const rowEl = document.createElement('div');
-                rowEl.className = 'vb-row';
+                const rowEl = html.create('div', { classList: ['vb-row'] });
 
                 if (item.items && item.items.length) {
                     for (let j = 0; j < item.items.length; j++) {
                         const field = item.items[j];
                         const span = field.span || 12;
-                        const colEl = document.createElement('div');
-                        colEl.className = 'vb-span-' + span;
+                        const colEl = html.create('div', { classList: ['vb-span-' + span] });
 
-                        const fieldContainer = document.createElement('div');
-                        fieldContainer.className = 'vb-form-field';
+                        const fieldContainer = html.create('div', { classList: ['vb-form-field'] });
 
                         if (field.label) {
-                            const label = document.createElement('label');
-                            label.textContent = field.label;
+                            const label = html.create('label', { text: field.label });
                             if (field.name) label.htmlFor = field.name;
-                            fieldContainer.appendChild(label);
+                            html.append(fieldContainer, label);
                         }
 
                         let input;
                         if (field.controlType === 'textarea') {
-                            input = document.createElement('textarea');
+                            input = html.create('textarea');
                         } else if (field.controlType === 'select') {
-                            input = document.createElement('select');
+                            input = html.create('select');
                             // TODO: options
                         } else {
-                            input = document.createElement('input');
+                            input = html.create('input');
                             input.type = field.inputType || 'text';
                         }
 
@@ -120,15 +118,17 @@ export const formItems = {
                             input.required = true;
                         }
 
-                        fieldContainer.appendChild(input);
-                        colEl.appendChild(fieldContainer);
-                        rowEl.appendChild(colEl);
+                        html.append(fieldContainer, input);
+                        html.append(colEl, fieldContainer);
+                        html.append(rowEl, colEl);
                     }
                 }
 
-                groupEl.appendChild(rowEl);
-                root.appendChild(groupEl);
+                html.append(groupEl, rowEl);
+                html.append(frag, groupEl);
             }
+
+            html.append(root, frag);
 
             // Add Actions container if needed (can be separate config)
         }
@@ -148,7 +148,7 @@ export const formItems = {
 
                     if (!items || items.length === 0) {
                         // Try to parse from global variable defined in attribute
-                        const root = this.brick.dom.element();
+                        const root = this.brick.html.element();
                         if (root) {
                             const configVar = root.getAttribute('brick-form-items') || root.getAttribute('data-form-items');
                             if (configVar && window[configVar]) {

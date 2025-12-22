@@ -1,12 +1,11 @@
-export const domCss = {
+export const htmlCss = {
   for: [{ host: 'brick', kind: '*' }],
-  requires: ['dom'],
+  requires: ['html'],
   ns: 'css',
   options: {},
 
   brick: {
-    addClass: function (className) {
-      const el = this.dom.element();
+    addClass: function (el, className) {
       if (!el || !className) return;
       if (el.classList && el.classList.add) {
         el.classList.add(className);
@@ -17,8 +16,7 @@ export const domCss = {
         }
       }
     },
-    removeClass: function (className) {
-      const el = this.dom.element();
+    removeClass: function (el,className) {
       if (!el || !className) return;
       if (el.classList && el.classList.remove) {
         el.classList.remove(className);
@@ -27,15 +25,13 @@ export const domCss = {
         el.className = (' ' + cur + ' ').replace(' ' + className + ' ', ' ').trim();
       }
     },
-    hasClass: function (className) {
-      const el = this.dom.element();
+    hasClass: function (el,className) {
       if (!el || !className) return false;
       if (el.classList && el.classList.contains) return el.classList.contains(className);
       const cur = el.className || '';
       return (' ' + cur + ' ').indexOf(' ' + className + ' ') !== -1;
     },
-    toggleClass: function (className, force) {
-      const el = this.dom.element();
+    toggleClass: function (el, className, force) {
       if (!el || !className) return;
       if (el.classList && typeof el.classList.toggle === 'function') {
         if (typeof force === 'boolean') el.classList.toggle(className, force);
@@ -51,35 +47,29 @@ export const domCss = {
         }
       }
     },
-    show: function () {
-      const el = this.dom.element();
+    show: function (el) {
       if (!el) return;
       el.style.display = '';
     },
-    hide: function () {
-      const el = this.dom.element();
+    hide: function (el) {
       if (!el) return;
       el.style.display = 'none';
     },
-    setStyle: function (prop, value) {
-      const el = this.dom.element();
+    setStyle: function (el,prop, value) {
       if (!el || !prop) return;
       el.style[prop] = value;
     },
-    getStyle: function (prop) {
-      const el = this.dom.element();
+    getStyle: function (el,prop) {
       if (!el || !prop || typeof window === 'undefined' || !window.getComputedStyle) return null;
       const cs = window.getComputedStyle(el);
       return cs ? (cs.getPropertyValue(prop) || cs[prop]) : null;
     },
-    setVar: function (name, value) {
-      const el = this.dom.element();
+    setVar: function (el, name, value) {
       if (!el || !name) return;
       if (name.indexOf('--') !== 0) name = '--' + name;
       el.style.setProperty(name, value);
     },
-    getVar: function (name) {
-      const el = this.dom.element();
+    getVar: function (el, name) {
       if (!el || !name || typeof window === 'undefined' || !window.getComputedStyle) return null;
       if (name.indexOf('--') !== 0) name = '--' + name;
       const cs = window.getComputedStyle(el);
@@ -91,13 +81,13 @@ export const domCss = {
   events: [],
 
   init: function () {
-    if (!this.brick || !this.brick.dom || typeof this.brick.dom.element !== 'function') {
-      console.warn('VanillaBrick domCss requires dom extension active', this.brick && this.brick.id);
+    if (!this.brick || !this.brick.html || typeof this.brick.html.element !== 'function') {
+      console.warn('VanillaBrick htmlCss requires html extension active', this.brick && this.brick.id);
       return false;
     }
-    const el = this.brick.dom.element();
+    const el = this.brick.html.element();
     if (!el) {
-      console.warn('VanillaBrick domCss: no DOM element resolved', this.brick && this.brick.id);
+      console.warn('VanillaBrick htmlCss: no DOM element resolved', this.brick && this.brick.id);
       return false;
     }
     return true;
@@ -107,5 +97,5 @@ export const domCss = {
 };
 
 
-export default domCss;
+export default htmlCss;
 

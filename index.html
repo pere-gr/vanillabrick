@@ -23,7 +23,7 @@
   <div class="vb-container-fluid">
     <header>
       <h1>VanillaBrick Demo</h1>
-      <p>Grid layout system with brick grid and HTML form</p>
+      <p>Table layout system with brick table and HTML form</p>
     </header>
     <div class="vb-row">
       <div class="vb-span-12">
@@ -32,7 +32,7 @@
         {
           "status1": {
             "wire": {
-              "slaveOf": [{"kind": "grid", "id": "grid1"}]
+              "slaveOf": [{"kind": "table", "id": "grid1"}]
             }
           }
         }
@@ -42,7 +42,7 @@
       <!-- Left column: Grid (brick) -->
       <div class="vb-span-6">
         <h2>Grid (Brick)</h2>
-        <table id="grid1" class="vb vb-grid" brick-kind="grid" wire-kind="master">
+        <table id="grid1" class="vb vb-table" brick-kind="table" wire-kind="master">
           <thead></thead>
           <tbody></tbody>
         </table>
@@ -116,7 +116,7 @@
           "form1": {
             "wire": {
               "master": true,
-              "slaveOf": [{"kind": "grid", "id": "grid1"},{"kind": "toolbar", "id": "tb1"}]
+              "slaveOf": [{"kind": "table", "id": "grid1"},{"kind": "toolbar", "id": "tb1"}]
             }
           }
         }

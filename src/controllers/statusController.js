@@ -18,8 +18,13 @@ StatusController.prototype.init = function (brick) {
         listening: true
     };
 
-    // Note: brick.status API wrapper is created in brick.js
-};
+    const self = this;
+    brick.status = {
+        get: () => self.get(brick),
+        set: (status, payload) => self.set(brick, status, payload),
+        is: (status) => self.is(brick, status)
+    }
+  };
 
 /**
  * Get current status

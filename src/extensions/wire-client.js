@@ -6,9 +6,9 @@ export const wire = {
 
     brick: {
         notify: function (eventName, data) {
-            console.warn("WireClient > sending notify", eventName, data);
-            console.log("\tfor event", eventName);
-            console.log("\twith payload", data);
+            //console.warn("WireClient > sending notify", eventName, data);
+            //console.log("\tfor event", eventName);
+            //console.log("\twith payload", data);
             if (!this.ext._service) this.ext._connect();
             if (!this.ext._service) return; // Still no service?
             this.ext._service.events.fire('wire:notify:out', {
@@ -18,11 +18,11 @@ export const wire = {
             });
         },
         request: function (eventName, data) {
-            console.warn("request", eventName, data);
-            console.log("this", this);
+            //console.warn("request", eventName, data);
+            //console.log("this", this);
             if (!this.ext._service) this.ext._connect();
             if (!this.ext._service) return; // Still no service?
-            console.log("this.service", this.ext._service);
+            //console.log("this.service", this.ext._service);
             this.ext._service.events.fire('wire:request:out', {
                 from: this.brick.id,
                 event: eventName,
