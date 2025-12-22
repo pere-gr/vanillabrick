@@ -39,7 +39,7 @@ export const tableRowsFocused = {
     events: [
             {
                 // Per-row render
-                for: 'table:render:row',
+                for: 'table:row:render',
                 before:{
                     fn: function(ev){
                         const html = this.brick.html;

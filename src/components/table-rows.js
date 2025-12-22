@@ -13,12 +13,11 @@ export const tableRows = {
 
       const rows = this.brick.store.load();
       const columns = this.brick.columns.get();
+
+      this.brick.events.fire('table:rows:data', { rows: rows, columns: columns });
+
       // Fire render pipeline
-      this.brick.events.fireAsync('table:render:rows', { rows: rows, columns: columns }).then(() => {
-        const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        const ms = Math.round(t1 - t0);
-        console.warn('table rows pipeline time', ms, 'ms');
-      });
+      this.brick.events.fire('table:rows:render', { rows: rows, columns: columns });
     }
   },
 
@@ -28,7 +27,8 @@ export const tableRows = {
     {
       for: 'brick:status:ready',
       on: {
-        fn: function () {
+        fn: function (ev) {
+          console.log("what happened?", ev.event.name);
           this.brick.rows.render();
         }
       }
@@ -37,21 +37,71 @@ export const tableRows = {
       for: 'store:data:*',
       after: {
         fn: function (ev) {
+          console.log("what happened?", ev.event.name);
           this.brick.rows.render();
         }
       }
     },
     {
+      for: 'table:rows:render',
+      before: {
+        priority:0,
+        fn:function(ev){
+          const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+          const html = this.brick.html;
+          const items = this.brick.options.get("table.rows") || {};
+          const rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
+          const columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
+
+          for (let i = 0; i < rows.length; i++){
+            let item = items[rows[i].key];
+            if (item == null){
+              item = {};
+              items[rows[i].key] = item ;
+            }
+
+            item.row = rows[i];
+            let tr = item.tr || null;
+            if (tr == null){
+              tr = html.create('tr');
+              html.attr(tr,'for',item.row.key);
+              items[item.row.key].tr = tr;
+            }
+
+            for(c = 0; c < columns.length; c++){
+              let td = tr.children.length > 0 ? tr.children[c] : null;
+              if (td == null){
+                td = html.create('td');
+                html.append(tr,td);
+              }
+              html.attr(td,'for',columns[c].datafield);
+              html.setSafe(td,item.row[columns[c].datafield])
+            }
+            
+          }
+          this.brick.options.setSilent("table.rows",items);
+          const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const ms = Math.round(t1 - t0);
+          console.warn('data created in...', ms, 'ms');
+        }
+      }
+    },    
+    {
       // Manage full rows render pipeline
-      for: 'table:render:rows',
+      for: 'table:rows:render',
       before: {
         fn: function (ev) {
           const html = this.brick.html;
           const root = html.element && html.element();
+          const items = this.brick.options.get("table.rows");
+          const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
           if (!root) return;
           ev.data = ev.data || {};
-
+          ev.data.t0 = t0;
           // Ensure rows/columns available to downstream phases
+          ev.data.items = items;
           ev.data.rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
           ev.data.columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
 
@@ -61,15 +111,13 @@ export const tableRows = {
           if (!table) return;
 
           // Prepare old/new tbody and pool of existing trs
-          const oldTbody = html.detach(table.querySelector('tbody')); /*(table.tBodies && table.tBodies.length)
-            ? table.tBodies[0]
-            : table.querySelector && table.querySelector('tbody');*/
-          const newTbody = html.create('tbody');
+          const tbody = html.detach(table.querySelector('tbody'));
+          for (i = tbody.children.length; i >= 0 ; i--){
+            html.detach(tbody.children[i]);
+          }
 
           ev.data.table = table;
-          ev.data.oldTbody = oldTbody;
-          ev.data.tbody = newTbody;
-          ev.data.frag = html.frag() || newTbody.ownerDocument.createDocumentFragment();
+          ev.data.tbody = tbody;
         }
       },
       on: {
@@ -80,12 +128,12 @@ export const tableRows = {
           data.columns = columns;
           data.rows = rows;
           for (let i = 0; i < rows.length; i += 1) {
+            const item = ev.data.items[rows[i].key];
             const rowData = rows[i] || {};
-            this.brick.events.fire('table:render:row', {
+            this.brick.events.fire('table:row:render', {
+              item: item,
               row: rowData,
               rowIndex: i,
-              oldTbody: data.oldTbody,
-              frag: data.frag,
               tbody: ev.data.tbody,
               columns: columns
             });
@@ -103,56 +151,44 @@ export const tableRows = {
           /*if (data.frag) {
             html.append(tbody, data.frag);
           }*/
+          requestAnimationFrame(() => {
+                    html.append(data.table,tbody);
+          });
 
-          html.append(data.table,tbody);
-          return;
-          // Replace old tbody with new
-          if (data.table) {
-            const table = data.table;
-            if (data.oldTbody && data.oldTbody.parentNode === table) {
-              table.replaceChild(tbody, data.oldTbody);
-            } else {
-              html.append(table, tbody);
-            }
-          }
+          const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          const ms = Math.round(t1 - ev.data.t0);
+        console.warn('table rows pipeline time', ms, 'ms');
+          //html.append(data.table,tbody);
         }
       }
     },
     {
       // Per-row render
-      for: 'table:render:row',
+      for: 'table:row:render',
       before: {
         fn: function (ev) {
           const html = this.brick.html;
-          let tr = null;
-          // Reuse from old tbody if available
-          const oldTbody = ev.data && ev.data.oldTbody;
-          if (oldTbody && oldTbody.firstChild) {
-            tr = oldTbody.firstChild;
-            oldTbody.removeChild(tr);
-          }
-          if (!tr) tr = html.create('tr');
-          
+          const tr = ev.data.item.tr;
           ev.data.tr = tr;
         }
       },
       on: {
         fn: function (ev) {
-          const html = this.brick.html;
+          /*const html = this.brick.html;
           const tr = ev.data.tr;
           const row = ev.data.row || {};
           const columns = ev.data.columns || [];
-          html.attr(tr,"key", row.key);
+          html.attr(tr,"for", row.key);
           for (let c = 0; c < columns.length; c += 1) {
             const col = columns[c] || {};
-            this.brick.events.fire('table:render:col', {
+            this.brick.events.fire('table:col:render', {
               tr: tr,
               tdIndex: c,
               column: col,
               row: row,
               rowIndex: ev.data.rowIndex
             });
-          }
+          }*/
         }
       },
       after: {
@@ -168,23 +204,21 @@ export const tableRows = {
     },
     {
       // Per-column render
-      for: 'table:render:col',
+      for: 'table:col:render',
       before: {
         fn: function (ev) {
           const html = this.brick.html;
           const tr = ev.data.tr;
-          const idx = ev.data.tdIndex;
+          const column = ev.data.column;
+          const row = ev.data.row;
           if (!tr) return;
-          let td = (tr.cells && tr.cells[idx]) ? tr.cells[idx] : null;
+          let td = html.get('[for="' + column.datafield + '"]',tr);
           if (!td) {
             td = html.create('td');
-            // insert at correct position
-            if (tr.cells && idx < tr.cells.length) {
-              tr.insertBefore(td, tr.cells[idx]);
-            } else {
-              html.append(tr, td);
-            }
+            html.attr(td,'for',column.datafield);
+            html.append(tr, td);
           }
+          html.setSafe(td,row[column.datafield]);
           ev.data.td = td;
         }
       },

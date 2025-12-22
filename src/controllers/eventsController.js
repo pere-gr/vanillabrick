@@ -318,9 +318,9 @@ EventBusController.prototype._run = async function (brick, eventName, payload) {
  * Fire-and-forget event.
  * eventName: "namespace:type:target"
  */
-EventBusController.prototype.fire = function (brick, eventName, payload) {
+EventBusController.prototype.fire = async function (brick, eventName, payload) {
   // Fire-and-forget; use fireAsync() if you need the final event object.
-  this._run(brick, eventName, payload);
+  await this._run(brick, eventName, payload);
 };
 
 /**

@@ -29,9 +29,11 @@ export const htmlRender = {
       return el;
     },
     // Safe getters/creators
-    get: function (selectorOrTag) {
+    get: function (selectorOrTag, root) {
       if (!selectorOrTag) return null;
-      const root = this.html && typeof this.html.element === 'function' ? this.html.element() : null;
+      if (root == null){
+        root = this.html && typeof this.html.element === 'function' ? this.html.element() : null;
+      }
       if (!root || !root.querySelector) return null;
       // If it's a tag name and root matches, return root
       if (selectorOrTag.toLowerCase && root.tagName && selectorOrTag.toLowerCase() === root.tagName.toLowerCase()) {

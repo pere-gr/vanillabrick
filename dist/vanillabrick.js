@@ -198,8 +198,8 @@
         status[name] = "visiting";
         const reqs = candidate.ext.requires || candidate.ext._requires;
         if (Array.isArray(reqs)) {
-          for (let i = 0; i < reqs.length; i++) {
-            const depName = reqs[i];
+          for (let i2 = 0; i2 < reqs.length; i2++) {
+            const depName = reqs[i2];
             if (!visit(depName)) {
               status[name] = "missing";
               return false;
@@ -222,8 +222,8 @@
      */
     _bake: function(defs) {
       const prototypes = {};
-      for (let i = 0; i < defs.length; i++) {
-        const def = defs[i];
+      for (let i2 = 0; i2 < defs.length; i2++) {
+        const def = defs[i2];
         const name = def.name || def.ext.ns;
         const protoExt = {
           _name: name,
@@ -379,8 +379,8 @@
   });
   function mergeOptions() {
     const result = {};
-    for (let i = 0; i < arguments.length; i++) {
-      const source = arguments[i];
+    for (let i2 = 0; i2 < arguments.length; i2++) {
+      const source = arguments[i2];
       if (!source || typeof source !== "object")
         continue;
       for (const key in source) {
@@ -404,10 +404,10 @@
       return obj[path];
     const parts = path.split(".");
     let current = obj;
-    for (let i = 0; i < parts.length; i++) {
+    for (let i2 = 0; i2 < parts.length; i2++) {
       if (current === void 0 || current === null)
         return void 0;
-      current = current[parts[i]];
+      current = current[parts[i2]];
     }
     return current;
   }
@@ -416,8 +416,8 @@
       return;
     const parts = path.split(".");
     let current = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const p = parts[i];
+    for (let i2 = 0; i2 < parts.length - 1; i2++) {
+      const p = parts[i2];
       if (current[p] === void 0 || current[p] === null) {
         current[p] = {};
       }
@@ -599,8 +599,8 @@
         on: [],
         after: []
       };
-      for (let i = 0; i < state.handlers.length; i += 1) {
-        const h = state.handlers[i];
+      for (let i2 = 0; i2 < state.handlers.length; i2 += 1) {
+        const h = state.handlers[i2];
         if (this._matches(h.compiled, key)) {
           if (handlersByPhase[h.phase]) {
             handlersByPhase[h.phase].push(h);
@@ -651,15 +651,15 @@
     if (!brick || !brick._runtime || !brick._runtime.events)
       return;
     const state = brick._runtime.events;
-    for (let i = state.handlers.length - 1; i >= 0; i -= 1) {
-      const h = state.handlers[i];
+    for (let i2 = state.handlers.length - 1; i2 >= 0; i2 -= 1) {
+      const h = state.handlers[i2];
       if (pattern && h.pattern !== pattern)
         continue;
       if (phase && h.phase !== phase)
         continue;
       if (handler && h.handler !== handler)
         continue;
-      state.handlers.splice(i, 1);
+      state.handlers.splice(i2, 1);
     }
     state.dispatchCache = {};
   };
@@ -668,10 +668,10 @@
     ev.stopPhase = false;
     const phaseHandlers = this._getHandlersForEvent(brick, eventName, phase);
     const runtime = globalThis.VanillaBrick ? globalThis.VanillaBrick.runtime : null;
-    for (let i = 0; i < phaseHandlers.length; i += 1) {
+    for (let i2 = 0; i2 < phaseHandlers.length; i2 += 1) {
       if (ev.stopPhase)
         break;
-      const h = phaseHandlers[i];
+      const h = phaseHandlers[i2];
       const hnd = h.handler;
       try {
         let r;
@@ -738,8 +738,8 @@
     }
     return ev;
   };
-  EventBusController.prototype.fire = function(brick, eventName, payload) {
-    this._run(brick, eventName, payload);
+  EventBusController.prototype.fire = async function(brick, eventName, payload) {
+    await this._run(brick, eventName, payload);
   };
   EventBusController.prototype.fireAsync = function(brick, eventName, payload) {
     return this._run(brick, eventName, payload);
@@ -795,8 +795,8 @@
       const kind = (brick.kind || "").toLowerCase();
       const coreDefaults = [];
       const extDefaults = [];
-      for (let i = 0; i < defs.length; i += 1) {
-        const def = defs[i];
+      for (let i2 = 0; i2 < defs.length; i2 += 1) {
+        const def = defs[i2];
         const defOpts = def.ext.options || def.ext._options;
         if (!defOpts)
           continue;
@@ -813,8 +813,8 @@
         brick._runtime.options.cache = {};
       }
     }
-    for (let i = 0; i < defs.length; i += 1) {
-      this._install(brick, defs[i]);
+    for (let i2 = 0; i2 < defs.length; i2 += 1) {
+      this._install(brick, defs[i2]);
     }
     this._ensureDestroyHook(brick);
   };
@@ -1053,8 +1053,8 @@
       if (!root.querySelectorAll)
         return;
       const scripts = root.querySelectorAll('script[type="application/json"][data-brick]');
-      for (let i = 0; i < scripts.length; i += 1) {
-        const node = scripts[i];
+      for (let i2 = 0; i2 < scripts.length; i2 += 1) {
+        const node = scripts[i2];
         const raw = node.textContent || "";
         if (!raw.trim())
           continue;
@@ -1119,8 +1119,8 @@
       loadConfigs(scope);
       const nodes = scope.querySelectorAll(".vb");
       const created = [];
-      for (let i = 0; i < nodes.length; i++) {
-        const brick = createBrickFromElement(nodes[i]);
+      for (let i2 = 0; i2 < nodes.length; i2++) {
+        const brick = createBrickFromElement(nodes[i2]);
         if (brick)
           created.push(brick);
       }
@@ -1291,8 +1291,8 @@
           return;
         const hasType = typeof type === "string" && type.length > 0;
         const hasHandler = typeof handler === "function";
-        for (let i = listeners.length - 1; i >= 0; i--) {
-          const ln = listeners[i];
+        for (let i2 = listeners.length - 1; i2 >= 0; i2--) {
+          const ln = listeners[i2];
           if (!ln || ln.el !== el)
             continue;
           if (hasType && ln.type !== type)
@@ -1300,7 +1300,7 @@
           if (hasHandler && ln.handler !== handler)
             continue;
           el.removeEventListener(ln.type, ln.handler, ln.options);
-          listeners.splice(i, 1);
+          listeners.splice(i2, 1);
         }
         this.brick.options.setSilent("html.listeners", listeners);
       }
@@ -1325,8 +1325,8 @@
               { type: "mousedown", eventName: "html:event:mousedown" },
               { type: "mouseup", eventName: "html:event:mouseup" }
             ];
-            for (let i = 0; i < defaultMap.length; i += 1) {
-              const entry = defaultMap[i];
+            for (let i2 = 0; i2 < defaultMap.length; i2 += 1) {
+              const entry = defaultMap[i2];
               const handler = function handler2(domEvent) {
                 self.brick.events.fire(entry.eventName, {
                   domEvent,
@@ -1348,8 +1348,8 @@
             const listeners = this.brick.options.get("html.events.listeners", []);
             if (!Array.isArray(listeners))
               return;
-            for (let i = 0; i < listeners.length; i += 1) {
-              const ln = listeners[i];
+            for (let i2 = 0; i2 < listeners.length; i2 += 1) {
+              const ln = listeners[i2];
               this.brick.html.off(el, ln.type, ln.handler, ln.options);
             }
           }
@@ -1390,10 +1390,12 @@
         return el;
       },
       // Safe getters/creators
-      get: function(selectorOrTag) {
+      get: function(selectorOrTag, root) {
         if (!selectorOrTag)
           return null;
-        const root = this.html && typeof this.html.element === "function" ? this.html.element() : null;
+        if (root == null) {
+          root = this.html && typeof this.html.element === "function" ? this.html.element() : null;
+        }
         if (!root || !root.querySelector)
           return null;
         if (selectorOrTag.toLowerCase && root.tagName && selectorOrTag.toLowerCase() === root.tagName.toLowerCase()) {
@@ -1496,8 +1498,8 @@
         while (walker.nextNode()) {
           const node = walker.currentNode;
           const attrs = Array.prototype.slice.call(node.attributes || []);
-          for (let i = 0; i < attrs.length; i++) {
-            const a = attrs[i];
+          for (let i2 = 0; i2 < attrs.length; i2++) {
+            const a = attrs[i2];
             const name = a.name.toLowerCase();
             const val = a.value || "";
             if (name.startsWith("on")) {
@@ -1582,10 +1584,10 @@
         const listeners = this.options.get("html.listeners", []);
         if (!Array.isArray(listeners))
           return;
-        for (let i = listeners.length - 1; i >= 0; i -= 1) {
-          const ln = listeners[i];
+        for (let i2 = listeners.length - 1; i2 >= 0; i2 -= 1) {
+          const ln = listeners[i2];
           if (ln.type === type && ln.handler === handler) {
-            listeners.splice(i, 1);
+            listeners.splice(i2, 1);
           }
         }
         this.options.setSilent("html.listeners", listeners);
@@ -1641,8 +1643,8 @@
       const listeners = this.brick.options.get("html.listeners", null);
       ;
       if (el && Array.isArray(listeners)) {
-        for (let i = 0; i < listeners.length; i += 1) {
-          const ln = listeners[i];
+        for (let i2 = 0; i2 < listeners.length; i2 += 1) {
+          const ln = listeners[i2];
           if (ln && ln.type && ln.handler) {
             el.removeEventListener(ln.type, ln.handler, ln.options);
           }
@@ -1673,7 +1675,87 @@
     { code: "17", name: "seventeen", key: 17 },
     { code: "18", name: "eighteen", key: 18 },
     { code: "19", name: "nineteen", key: 19 },
-    { code: "20", name: "twenty", key: 20 }
+    { code: "20", name: "twenty", key: 20 },
+    { code: "21", name: "twenty-one", key: 21 },
+    { code: "22", name: "twenty-two", key: 22 },
+    { code: "23", name: "twenty-three", key: 23 },
+    { code: "24", name: "twenty-four", key: 24 },
+    { code: "25", name: "twenty-five", key: 25 },
+    { code: "26", name: "twenty-six", key: 26 },
+    { code: "27", name: "twenty-seven", key: 27 },
+    { code: "28", name: "twenty-eight", key: 28 },
+    { code: "29", name: "twenty-nine", key: 29 },
+    { code: "30", name: "thirty", key: 30 },
+    { code: "31", name: "thirty-one", key: 31 },
+    { code: "32", name: "thirty-two", key: 32 },
+    { code: "33", name: "thirty-three", key: 33 },
+    { code: "34", name: "thirty-four", key: 34 },
+    { code: "35", name: "thirty-five", key: 35 },
+    { code: "36", name: "thirty-six", key: 36 },
+    { code: "37", name: "thirty-seven", key: 37 },
+    { code: "38", name: "thirty-eight", key: 38 },
+    { code: "39", name: "thirty-nine", key: 39 },
+    { code: "40", name: "forty", key: 40 },
+    { code: "41", name: "forty-one", key: 41 },
+    { code: "42", name: "forty-two", key: 42 },
+    { code: "43", name: "forty-three", key: 43 },
+    { code: "44", name: "forty-four", key: 44 },
+    { code: "45", name: "forty-five", key: 45 },
+    { code: "46", name: "forty-six", key: 46 },
+    { code: "47", name: "forty-seven", key: 47 },
+    { code: "48", name: "forty-eight", key: 48 },
+    { code: "49", name: "forty-nine", key: 49 },
+    { code: "50", name: "fifty", key: 50 },
+    { code: "51", name: "fifty-one", key: 51 },
+    { code: "52", name: "fifty-two", key: 52 },
+    { code: "53", name: "fifty-three", key: 53 },
+    { code: "54", name: "fifty-four", key: 54 },
+    { code: "55", name: "fifty-five", key: 55 },
+    { code: "56", name: "fifty-six", key: 56 },
+    { code: "57", name: "fifty-seven", key: 57 },
+    { code: "58", name: "fifty-eight", key: 58 },
+    { code: "59", name: "fifty-nine", key: 59 },
+    { code: "60", name: "sixty", key: 60 },
+    { code: "61", name: "sixty-one", key: 61 },
+    { code: "62", name: "sixty-two", key: 62 },
+    { code: "63", name: "sixty-three", key: 63 },
+    { code: "64", name: "sixty-four", key: 64 },
+    { code: "65", name: "sixty-five", key: 65 },
+    { code: "66", name: "sixty-six", key: 66 },
+    { code: "67", name: "sixty-seven", key: 67 },
+    { code: "68", name: "sixty-eight", key: 68 },
+    { code: "69", name: "sixty-nine", key: 69 },
+    { code: "70", name: "seventy", key: 70 },
+    { code: "71", name: "seventy-one", key: 71 },
+    { code: "72", name: "seventy-two", key: 72 },
+    { code: "73", name: "seventy-three", key: 73 },
+    { code: "74", name: "seventy-four", key: 74 },
+    { code: "75", name: "seventy-five", key: 75 },
+    { code: "76", name: "seventy-six", key: 76 },
+    { code: "77", name: "seventy-seven", key: 77 },
+    { code: "78", name: "seventy-eight", key: 78 },
+    { code: "79", name: "seventy-nine", key: 79 },
+    { code: "80", name: "eighty", key: 80 },
+    { code: "81", name: "eighty-one", key: 81 },
+    { code: "82", name: "eighty-two", key: 82 },
+    { code: "83", name: "eighty-three", key: 83 },
+    { code: "84", name: "eighty-four", key: 84 },
+    { code: "85", name: "eighty-five", key: 85 },
+    { code: "86", name: "eighty-six", key: 86 },
+    { code: "87", name: "eighty-seven", key: 87 },
+    { code: "88", name: "eighty-eight", key: 88 },
+    { code: "89", name: "eighty-nine", key: 89 },
+    { code: "90", name: "ninety", key: 90 },
+    { code: "91", name: "ninety-one", key: 91 },
+    { code: "92", name: "ninety-two", key: 92 },
+    { code: "93", name: "ninety-three", key: 93 },
+    { code: "94", name: "ninety-four", key: 94 },
+    { code: "95", name: "ninety-five", key: 95 },
+    { code: "96", name: "ninety-six", key: 96 },
+    { code: "97", name: "ninety-seven", key: 97 },
+    { code: "98", name: "ninety-eight", key: 98 },
+    { code: "99", name: "ninety-nine", key: 99 },
+    { code: "100", name: "one hundred", key: 100 }
   ];
   var store = {
     for: [
@@ -1885,8 +1967,8 @@
             const evData = ev.data.data;
             const slaves = this.ext._slaves[master];
             if (slaves && slaves.length > 0) {
-              for (let i = 0; i < slaves.length; i++) {
-                slaves[i].brick.events.fire(evName, evData);
+              for (let i2 = 0; i2 < slaves.length; i2++) {
+                slaves[i2].brick.events.fire(evName, evData);
               }
             }
           }
@@ -1913,17 +1995,17 @@
             this.ext._masters = {};
           if (this.ext._slaves == null)
             this.ext._slaves = {};
-          for (let i = 0; i < data.options.slaveOf.length; i++) {
+          for (let i2 = 0; i2 < data.options.slaveOf.length; i2++) {
             let master = this.ext._masters[data.brick.id];
             if (!master) {
               this.ext._masters[data.brick.id] = [];
             }
-            this.ext._masters[data.brick.id].push({ id: data.options.slaveOf[i].id, kind: data.options.slaveOf[i].kind });
-            let slave = this.ext._slaves[data.options.slaveOf[i].id];
+            this.ext._masters[data.brick.id].push({ id: data.options.slaveOf[i2].id, kind: data.options.slaveOf[i2].kind });
+            let slave = this.ext._slaves[data.options.slaveOf[i2].id];
             if (!slave) {
-              this.ext._slaves[data.options.slaveOf[i].id] = [];
+              this.ext._slaves[data.options.slaveOf[i2].id] = [];
             }
-            this.ext._slaves[data.options.slaveOf[i].id].push({ id: data.brick.id, kind: data.brick.kind, brick: data.brick });
+            this.ext._slaves[data.options.slaveOf[i2].id].push({ id: data.brick.id, kind: data.brick.kind, brick: data.brick });
           }
         }
       }
@@ -1949,8 +2031,8 @@
           return [];
         const items = [];
         const groups = root.querySelectorAll(".vb-form-group");
-        for (let i = 0; i < groups.length; i++) {
-          const groupEl = groups[i];
+        for (let i2 = 0; i2 < groups.length; i2++) {
+          const groupEl = groups[i2];
           const group = {
             type: "group",
             items: []
@@ -2000,8 +2082,8 @@
           return;
         html2.clear(root);
         const frag = html2.frag() || root.ownerDocument.createDocumentFragment();
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
+        for (let i2 = 0; i2 < items.length; i2++) {
+          const item = items[i2];
           if (item.type !== "group")
             continue;
           const groupEl = html2.create("div", { classList: ["vb-form-group"] });
@@ -2115,8 +2197,8 @@
         if (!root)
           return;
         const inputs = root.querySelectorAll("input, select, textarea");
-        for (let i = 0; i < inputs.length; i++) {
-          const input = inputs[i];
+        for (let i2 = 0; i2 < inputs.length; i2++) {
+          const input = inputs[i2];
           const name = input.name || input.id;
           if (!name)
             continue;
@@ -2249,8 +2331,8 @@
       },
       sort: function(field, dir) {
         const cols = this.brick.columns.get();
-        const colDef = cols.find(function(c) {
-          return c && c.datafield === field;
+        const colDef = cols.find(function(c2) {
+          return c2 && c2.datafield === field;
         }) || {};
         const state = this.options.get("table.sort", { field: null, dir: null });
         let nextDir = dir;
@@ -2282,8 +2364,8 @@
             const thead = html2.create("thead");
             const row = thead.insertRow();
             const brick = this.brick;
-            for (let i = 0; i < columns.length; i += 1) {
-              const col = columns[i] || {};
+            for (let i2 = 0; i2 < columns.length; i2 += 1) {
+              const col = columns[i2] || {};
               const th = html2.create("th", { text: col.label || col.datafield || "" });
               if (col.sortable && col.datafield) {
                 th.classList.add("vb-sortable");
@@ -2380,7 +2462,7 @@
     events: [
       {
         // Per-row render
-        for: "table:render:row",
+        for: "table:row:render",
         before: {
           fn: function(ev) {
             const html2 = this.brick.html;
@@ -2428,11 +2510,8 @@
         const t0 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
         const rows = this.brick.store.load();
         const columns = this.brick.columns.get();
-        this.brick.events.fireAsync("table:render:rows", { rows, columns }).then(() => {
-          const t1 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
-          const ms = Math.round(t1 - t0);
-          console.warn("table rows pipeline time", ms, "ms");
-        });
+        this.brick.events.fire("table:rows:data", { rows, columns });
+        this.brick.events.fire("table:rows:render", { rows, columns });
       }
     },
     extension: {},
@@ -2440,7 +2519,8 @@
       {
         for: "brick:status:ready",
         on: {
-          fn: function() {
+          fn: function(ev) {
+            console.log("what happened?", ev.event.name);
             this.brick.rows.render();
           }
         }
@@ -2449,31 +2529,76 @@
         for: "store:data:*",
         after: {
           fn: function(ev) {
+            console.log("what happened?", ev.event.name);
             this.brick.rows.render();
           }
         }
       },
       {
+        for: "table:rows:render",
+        before: {
+          priority: 0,
+          fn: function(ev) {
+            const t0 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+            const html2 = this.brick.html;
+            const items = this.brick.options.get("table.rows") || {};
+            const rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
+            const columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
+            for (let i2 = 0; i2 < rows.length; i2++) {
+              let item = items[rows[i2].key];
+              if (item == null) {
+                item = {};
+                items[rows[i2].key] = item;
+              }
+              item.row = rows[i2];
+              let tr = item.tr || null;
+              if (tr == null) {
+                tr = html2.create("tr");
+                html2.attr(tr, "for", item.row.key);
+                items[item.row.key].tr = tr;
+              }
+              for (c = 0; c < columns.length; c++) {
+                let td = tr.children.length > 0 ? tr.children[c] : null;
+                if (td == null) {
+                  td = html2.create("td");
+                  html2.append(tr, td);
+                }
+                html2.attr(td, "for", columns[c].datafield);
+                html2.setSafe(td, item.row[columns[c].datafield]);
+              }
+            }
+            this.brick.options.setSilent("table.rows", items);
+            const t1 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+            const ms = Math.round(t1 - t0);
+            console.warn("data created in...", ms, "ms");
+          }
+        }
+      },
+      {
         // Manage full rows render pipeline
-        for: "table:render:rows",
+        for: "table:rows:render",
         before: {
           fn: function(ev) {
             const html2 = this.brick.html;
             const root = html2.element && html2.element();
+            const items = this.brick.options.get("table.rows");
+            const t0 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
             if (!root)
               return;
             ev.data = ev.data || {};
+            ev.data.t0 = t0;
+            ev.data.items = items;
             ev.data.rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
             ev.data.columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
             const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : html2.get && html2.get("table") || root.querySelector && root.querySelector("table");
             if (!table2)
               return;
-            const oldTbody = html2.detach(table2.querySelector("tbody"));
-            const newTbody = html2.create("tbody");
+            const tbody = html2.detach(table2.querySelector("tbody"));
+            for (i = tbody.children.length; i >= 0; i--) {
+              html2.detach(tbody.children[i]);
+            }
             ev.data.table = table2;
-            ev.data.oldTbody = oldTbody;
-            ev.data.tbody = newTbody;
-            ev.data.frag = html2.frag() || newTbody.ownerDocument.createDocumentFragment();
+            ev.data.tbody = tbody;
           }
         },
         on: {
@@ -2483,13 +2608,13 @@
             const columns = Array.isArray(ev && ev.data && ev.data.columns) ? ev.data.columns : this.brick.columns.get();
             data.columns = columns;
             data.rows = rows;
-            for (let i = 0; i < rows.length; i += 1) {
-              const rowData = rows[i] || {};
-              this.brick.events.fire("table:render:row", {
+            for (let i2 = 0; i2 < rows.length; i2 += 1) {
+              const item = ev.data.items[rows[i2].key];
+              const rowData = rows[i2] || {};
+              this.brick.events.fire("table:row:render", {
+                item,
                 row: rowData,
-                rowIndex: i,
-                oldTbody: data.oldTbody,
-                frag: data.frag,
+                rowIndex: i2,
                 tbody: ev.data.tbody,
                 columns
               });
@@ -2503,53 +2628,27 @@
             const tbody = data.tbody;
             if (!tbody)
               return;
-            html2.append(data.table, tbody);
-            return;
-            if (data.table) {
-              const table2 = data.table;
-              if (data.oldTbody && data.oldTbody.parentNode === table2) {
-                table2.replaceChild(tbody, data.oldTbody);
-              } else {
-                html2.append(table2, tbody);
-              }
-            }
+            requestAnimationFrame(() => {
+              html2.append(data.table, tbody);
+            });
+            const t1 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+            const ms = Math.round(t1 - ev.data.t0);
+            console.warn("table rows pipeline time", ms, "ms");
           }
         }
       },
       {
         // Per-row render
-        for: "table:render:row",
+        for: "table:row:render",
         before: {
           fn: function(ev) {
             const html2 = this.brick.html;
-            let tr = null;
-            const oldTbody = ev.data && ev.data.oldTbody;
-            if (oldTbody && oldTbody.firstChild) {
-              tr = oldTbody.firstChild;
-              oldTbody.removeChild(tr);
-            }
-            if (!tr)
-              tr = html2.create("tr");
+            const tr = ev.data.item.tr;
             ev.data.tr = tr;
           }
         },
         on: {
           fn: function(ev) {
-            const html2 = this.brick.html;
-            const tr = ev.data.tr;
-            const row = ev.data.row || {};
-            const columns = ev.data.columns || [];
-            html2.attr(tr, "key", row.key);
-            for (let c = 0; c < columns.length; c += 1) {
-              const col = columns[c] || {};
-              this.brick.events.fire("table:render:col", {
-                tr,
-                tdIndex: c,
-                column: col,
-                row,
-                rowIndex: ev.data.rowIndex
-              });
-            }
           }
         },
         after: {
@@ -2565,23 +2664,22 @@
       },
       {
         // Per-column render
-        for: "table:render:col",
+        for: "table:col:render",
         before: {
           fn: function(ev) {
             const html2 = this.brick.html;
             const tr = ev.data.tr;
-            const idx = ev.data.tdIndex;
+            const column = ev.data.column;
+            const row = ev.data.row;
             if (!tr)
               return;
-            let td = tr.cells && tr.cells[idx] ? tr.cells[idx] : null;
+            let td = html2.get('[for="' + column.datafield + '"]', tr);
             if (!td) {
               td = html2.create("td");
-              if (tr.cells && idx < tr.cells.length) {
-                tr.insertBefore(td, tr.cells[idx]);
-              } else {
-                html2.append(tr, td);
-              }
+              html2.attr(td, "for", column.datafield);
+              html2.append(tr, td);
             }
+            html2.setSafe(td, row[column.datafield]);
             ev.data.td = td;
           }
         },
@@ -2671,11 +2769,11 @@
         if (typeof index !== "number" || index < 0 || index >= rows.length) {
           index = -1;
         }
-        for (let i = 0; i < rows.length; i += 1) {
-          const row = rows[i];
+        for (let i2 = 0; i2 < rows.length; i2 += 1) {
+          const row = rows[i2];
           if (!row || !row.classList)
             continue;
-          if (i === index)
+          if (i2 === index)
             row.classList.add("selected");
           else
             row.classList.remove("selected");
