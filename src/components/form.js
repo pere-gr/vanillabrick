@@ -3,18 +3,19 @@ export const form = {
     requires: ['html'],
     ns: 'form',
     options: {
-        items:[],
+        items: [],
     },
 
     brick: {
         // Basic form component methods can be added here
         submit: function () {
-            // Placeholder for submit logic
-            const el = this.dom.element();
+            // Trigger form submit
+            const el = this.brick.html.element();
             if (el && typeof el.submit === 'function') el.submit();
         },
         reset: function () {
-            const el = this.dom.element();
+            // Trigger form reset
+            const el = this.brick.html.element();
             if (el && typeof el.reset === 'function') el.reset();
         }
     },

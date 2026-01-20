@@ -1,3 +1,10 @@
+/**
+ * Store Extension (Core)
+ * Manages data state for bricks. Provides public API and coordinates
+ * with strategy extensions (store-local, store-remote).
+ */
+
+// Sample data for development - TODO: move to fixtures
 const DATA_SAMPLE_ROWS = [
   { code: '1', name: 'one', key: 1 },
   { code: '2', name: 'two', key: 2 },
@@ -8,219 +15,308 @@ const DATA_SAMPLE_ROWS = [
   { code: '7', name: 'seven', key: 7 },
   { code: '8', name: 'eight', key: 8 },
   { code: '9', name: 'nine', key: 9 },
-  { code: '10', name: 'ten', key: 10 },
-  { code: '11', name: 'eleven', key: 11 },
-  { code: '12', name: 'twelve', key: 12 },
-  { code: '13', name: 'thirteen', key: 13 },
-  { code: '14', name: 'fourteen', key: 14 },
-  { code: '15', name: 'fifteen', key: 15 },
-  { code: '16', name: 'sixteen', key: 16 },
-  { code: '17', name: 'seventeen', key: 17 },
-  { code: '18', name: 'eighteen', key: 18 },
-  { code: '19', name: 'nineteen', key: 19 },
-  { code: '20', name: 'twenty', key: 20 },
-  { code: '21', name: 'twenty-one', key: 21 },
-  { code: '22', name: 'twenty-two', key: 22 },
-  { code: '23', name: 'twenty-three', key: 23 },
-  { code: '24', name: 'twenty-four', key: 24 },
-  { code: '25', name: 'twenty-five', key: 25 },
-  { code: '26', name: 'twenty-six', key: 26 },
-  { code: '27', name: 'twenty-seven', key: 27 },
-  { code: '28', name: 'twenty-eight', key: 28 },
-  { code: '29', name: 'twenty-nine', key: 29 },
-  { code: '30', name: 'thirty', key: 30 },
-  { code: '31', name: 'thirty-one', key: 31 },
-  { code: '32', name: 'thirty-two', key: 32 },
-  { code: '33', name: 'thirty-three', key: 33 },
-  { code: '34', name: 'thirty-four', key: 34 },
-  { code: '35', name: 'thirty-five', key: 35 },
-  { code: '36', name: 'thirty-six', key: 36 },
-  { code: '37', name: 'thirty-seven', key: 37 },
-  { code: '38', name: 'thirty-eight', key: 38 },
-  { code: '39', name: 'thirty-nine', key: 39 },
-  { code: '40', name: 'forty', key: 40 },
-  { code: '41', name: 'forty-one', key: 41 },
-  { code: '42', name: 'forty-two', key: 42 },
-  { code: '43', name: 'forty-three', key: 43 },
-  { code: '44', name: 'forty-four', key: 44 },
-  { code: '45', name: 'forty-five', key: 45 },
-  { code: '46', name: 'forty-six', key: 46 },
-  { code: '47', name: 'forty-seven', key: 47 },
-  { code: '48', name: 'forty-eight', key: 48 },
-  { code: '49', name: 'forty-nine', key: 49 },
-  { code: '50', name: 'fifty', key: 50 },
-  { code: '51', name: 'fifty-one', key: 51 },
-  { code: '52', name: 'fifty-two', key: 52 },
-  { code: '53', name: 'fifty-three', key: 53 },
-  { code: '54', name: 'fifty-four', key: 54 },
-  { code: '55', name: 'fifty-five', key: 55 },
-  { code: '56', name: 'fifty-six', key: 56 },
-  { code: '57', name: 'fifty-seven', key: 57 },
-  { code: '58', name: 'fifty-eight', key: 58 },
-  { code: '59', name: 'fifty-nine', key: 59 },
-  { code: '60', name: 'sixty', key: 60 },
-  { code: '61', name: 'sixty-one', key: 61 },
-  { code: '62', name: 'sixty-two', key: 62 },
-  { code: '63', name: 'sixty-three', key: 63 },
-  { code: '64', name: 'sixty-four', key: 64 },
-  { code: '65', name: 'sixty-five', key: 65 },
-  { code: '66', name: 'sixty-six', key: 66 },
-  { code: '67', name: 'sixty-seven', key: 67 },
-  { code: '68', name: 'sixty-eight', key: 68 },
-  { code: '69', name: 'sixty-nine', key: 69 },
-  { code: '70', name: 'seventy', key: 70 },
-  { code: '71', name: 'seventy-one', key: 71 },
-  { code: '72', name: 'seventy-two', key: 72 },
-  { code: '73', name: 'seventy-three', key: 73 },
-  { code: '74', name: 'seventy-four', key: 74 },
-  { code: '75', name: 'seventy-five', key: 75 },
-  { code: '76', name: 'seventy-six', key: 76 },
-  { code: '77', name: 'seventy-seven', key: 77 },
-  { code: '78', name: 'seventy-eight', key: 78 },
-  { code: '79', name: 'seventy-nine', key: 79 },
-  { code: '80', name: 'eighty', key: 80 },
-  { code: '81', name: 'eighty-one', key: 81 },
-  { code: '82', name: 'eighty-two', key: 82 },
-  { code: '83', name: 'eighty-three', key: 83 },
-  { code: '84', name: 'eighty-four', key: 84 },
-  { code: '85', name: 'eighty-five', key: 85 },
-  { code: '86', name: 'eighty-six', key: 86 },
-  { code: '87', name: 'eighty-seven', key: 87 },
-  { code: '88', name: 'eighty-eight', key: 88 },
-  { code: '89', name: 'eighty-nine', key: 89 },
-  { code: '90', name: 'ninety', key: 90 },
-  { code: '91', name: 'ninety-one', key: 91 },
-  { code: '92', name: 'ninety-two', key: 92 },
-  { code: '93', name: 'ninety-three', key: 93 },
-  { code: '94', name: 'ninety-four', key: 94 },
-  { code: '95', name: 'ninety-five', key: 95 },
-  { code: '96', name: 'ninety-six', key: 96 },
-  { code: '97', name: 'ninety-seven', key: 97 },
-  { code: '98', name: 'ninety-eight', key: 98 },
-  { code: '99', name: 'ninety-nine', key: 99 },
-  { code: '100', name: 'one hundred', key: 100 },
+  { code: '10', name: 'ten', key: 10 }
 ];
 
 export const store = {
-  for: [
-    { host: 'brick', kind: 'form' },
-    { host: 'brick', kind: 'table' }
-  ],
+  for: [{ host: 'brick', kind: '*' }],
   requires: [],
   ns: 'store',
-  options: {},
-
-  // API pública sobre el brick (this === brick)
-  brick: {
-    load: function () {
-      return this.brick.options.get('store.data', []);
-    },
-    set: function (data) {
-      if (data === null) return;
-      const previous = this.brick.options.get('store.data', []);
-      data = Array.isArray(data) ? data.slice() : [data];
-
-      this.brick.events.fire('store:data:set', {
-        previous: previous,
-        data: data
-      });
-
-      return data;
-    },
-    setAsync: async function (data) {
-      const previous = this.brick.options.get('store.data', []);
-      data = Array.isArray(data) ? data.slice() : [];
-
-      await this.brick.events.fireAsync('store:data:set', {
-        previous: previous,
-        data: data
-      });
-
-      return data;
-    },
-    all: function () {
-      return this.brick.store.load();
-    },
-    get: function (index) {
-      const arr = this.brick.store.load();
-      if (typeof index !== 'number') return null;
-      if (index < 0 || index >= arr.length) return null;
-      return arr[index];
+  options: {
+    store: {
+      type: 'local',     // 'local' | 'remote'
+      uidField: 'key',
+      data: []
     }
   },
 
-  // Helpers interns (this === ext)
+  /**
+   * Public Brick API (this = extension context with this.brick)
+   */
+  brick: {
+    /**
+     * Get the configured UID field name
+     * @returns {string}
+     */
+    uidField: function () {
+      return this.brick.options.get('store.uidField', 'key');
+    },
+
+    /**
+     * Get current store data array (Sparse Array)
+     * @returns {Array}
+     */
+    data: function () {
+      return this.brick.options.get('store.data', []);
+    },
+
+    /**
+     * Get current store type
+     * @returns {string} 'memory' | 'local' | 'remote'
+     */
+    type: function () {
+      return this.brick.options.get('store.type', 'memory');
+    },
+
+    /**
+     * Ensure a specific range of data is loaded.
+     * Fires 'store:data:ensure' if gaps are found.
+     * @param {number} start - Start index
+     * @param {number} count - Number of items
+     * @returns {Promise}
+     */
+    ensureRange: async function (start, count) {
+      const data = this.brick.options.get('store.data', []);
+      const total = this.brick.options.get('store.totalCount', 0);
+
+      // If we know the total, cap the request
+      if (total > 0 && start >= total) return;
+      const effectiveCount = (total > 0) ? Math.min(count, total - start) : count;
+
+      // Check for gaps
+      let hasGap = false;
+      for (let i = start; i < start + effectiveCount; i++) {
+        if (!data[i]) {
+          hasGap = true;
+          break;
+        }
+      }
+
+      if (hasGap) {
+        // Fire ensure event (strategies should handle this)
+        // Basic debounce/throttle could be added here if needed to avoid spamming
+        await this.brick.events.fireAsync('store:data:ensure', { start: start, count: effectiveCount });
+      }
+    },
+
+    /**
+     * Trigger full data load/reset
+     * @returns {Promise}
+     */
+    load: async function () {
+      // Clear data for fresh load
+      this.brick.options.setSilent('store.data', []);
+      // Reset total count to default (if configured) or 0
+      const defaultTotal = this.brick.options.get('store.defaultTotalCount', 0);
+      this.brick.options.setSilent('store.totalCount', defaultTotal);
+      return this.brick.events.fireAsync('store:data:load', {});
+    },
+
+    /**
+     * Set store data directly (updates specific range or full replace)
+     * @param {Array} rows - New data rowsv
+     * @param {number} [start=0] - Starting index (if partial update)
+     * @returns {Object} brick
+     */
+    set: function (rows, start) {
+      if (!rows) return this.brick;
+      const newRows = Array.isArray(rows) ? rows : [rows];
+      const currentData = this.brick.options.get('store.data', []);
+      const total = this.brick.options.get('store.totalCount', 0);
+
+      // If start is provided, merge. Else replace.
+      let nextData;
+      if (typeof start === 'number') {
+        nextData = currentData; // In-place mutation of the array reference (be careful with reactivity if we had deep watchers)
+        // We prefer creating a new reference for safety in some frameworks, but for vanilla huge arrays, mutation is better.
+        // Let's stick to mutation for performance, but trigger update.
+        for (let i = 0; i < newRows.length; i++) {
+          nextData[start + i] = newRows[i];
+        }
+        // Auto-update total count if we grew past it
+        if (nextData.length > total) {
+          this.brick.options.setSilent('store.totalCount', nextData.length);
+        }
+      } else {
+        nextData = newRows; // Full replace
+        this.brick.options.setSilent('store.totalCount', nextData.length);
+      }
+
+      this.brick.options.setSilent('store.data', nextData);
+
+      this.brick.events.fire('store:data:updated', {
+        data: nextData,
+        start: start || 0,
+        count: newRows.length
+      });
+
+      return this.brick;
+    },
+
+    /**
+     * Get all records (careful with large sparse arrays)
+     * @returns {Array}
+     */
+    all: function () {
+      return this.brick.options.get('store.data', []);
+    },
+
+    /**
+     * Get record by index
+     * @param {number} index
+     * @returns {Object|null}
+     */
+    get: function (index) {
+      const arr = this.brick.options.get('store.data', []);
+      return arr[index] || null;
+    },
+
+    /**
+     * Get record by UID
+     * @param {*} uid
+     * @returns {Object|null}
+     */
+    find: function (uid) {
+      const arr = this.brick.options.get('store.data', []);
+      const field = this.brick.store.uidField();
+      // Linear search is slow for huge arrays. 
+      // TODO: Implement Lookup Map in future update
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i] && arr[i][field] === uid) return arr[i];
+      }
+      return null;
+    },
+
+    /**
+     * Get total record count
+     * @returns {number}
+     */
+    count: function () {
+      return this.brick.options.get('store.totalCount', 0);
+    },
+
+    /**
+     * Trigger sort operation
+     * @param {string} field
+     * @param {string} dir
+     * @param {Function} compareFn
+     */
+    sort: function (field, dir, compareFn) {
+      // Sorting a sparse array/remote data is complex.
+      // For now, we fire event so Remote strategy can reload with sort params.
+      this.brick.events.fire('store:data:sort', {
+        field: field,
+        dir: dir || 'asc',
+        compare: compareFn
+      });
+      return this.brick;
+    }
+  },
+
+  /**
+   * Private extension helpers (this = extension context)
+   */
   extension: {
+    /**
+     * Normalize value to array
+     * @param {*} value
+     * @param {Array} fallback
+     * @returns {Array}
+     */
     _normalizeArray: function (value, fallback) {
       if (Array.isArray(value)) return value.slice();
       return Array.isArray(fallback) ? fallback.slice() : [];
     },
+
+    /**
+     * Sort rows by field
+     * @param {Array} rows
+     * @param {string} field
+     * @param {string} dir - 'asc' or 'desc'
+     * @param {Function} compareFn - Optional custom compare
+     * @returns {Array} sorted copy
+     */
     _sortRows: function (rows, field, dir, compareFn) {
       const arr = Array.isArray(rows) ? rows.slice() : [];
+      const direction = dir === 'desc' ? -1 : 1;
+
       const cmp = typeof compareFn === 'function'
         ? function (a, b) { return compareFn(a, b, dir); }
         : function (a, b) {
           const va = a && Object.prototype.hasOwnProperty.call(a, field) ? a[field] : undefined;
           const vb = b && Object.prototype.hasOwnProperty.call(b, field) ? b[field] : undefined;
-          let res = 0;
-          if (va === vb) res = 0;
-          else if (va === undefined || va === null) res = -1;
-          else if (vb === undefined || vb === null) res = 1;
-          else if (typeof va === 'number' && typeof vb === 'number') res = va - vb;
-          else res = String(va).localeCompare(String(vb));
-          return dir === 'desc' ? -res : res;
+
+          if (va === vb) return 0;
+          if (va === undefined || va === null) return -1 * direction;
+          if (vb === undefined || vb === null) return 1 * direction;
+          if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * direction;
+          return String(va).localeCompare(String(vb)) * direction;
         };
+
       arr.sort(cmp);
       return arr;
-    }
+    },
+
   },
 
+  /**
+   * Event handlers
+   */
   events: [
+    // On brick ready, trigger store load
     {
       for: 'brick:status:ready',
       on: {
-        fn: function (ev) {
-          //const storeData = this.brick.options.get('store:data', null);
-          const storeData = this._normalizeArray(DATA_SAMPLE_ROWS, []);
-          this.brick.options.setSilent('store.data', storeData);
+        priority: 5,
+        fn: function () {
+          const storeType = this.brick.options.get('store.type', 'local');
+          const existingData = this.brick.options.get('store.data', null);
+
+          // Only load sample data for local type with no data (dev mode)
+          if (storeType === 'local' && (!existingData || existingData.length === 0)) {
+            const sampleData = this._normalizeArray(DATA_SAMPLE_ROWS, []);
+            this.brick.options.setSilent('store.data', sampleData);
+          }
+
+          // Trigger load for all types
+          this.brick.store.load();
         }
       }
     },
+
+    // Handle store:data:set - persist data to options
     {
       for: 'store:data:set',
       on: {
+        priority: 5,
         fn: function (ev) {
-          const payload = (ev && ev.data) || null;
-          const data = payload && payload.data ? payload.data : [];
+          const payload = (ev && ev.data) || {};
+          const data = payload.data || [];
           this.brick.options.setSilent('store.data', data);
+          ev.data = { data: data, previous: payload.previous };
         }
       }
     },
+
+    // Handle store:data:sort
     {
       for: 'store:data:sort',
       on: {
+        priority: 5,
         fn: function (ev) {
           const payload = (ev && ev.data) || {};
-
-          const field = payload.field || null;
+          const field = payload.field;
           const dir = payload.dir || 'asc';
 
-          if (!field || !this.brick) return;
-          const sorted = this._sortRows(this.brick.store.load(), field, dir, payload.compare);
-          this.brick.options.setSilent("store.data", sorted);
-          ev.field = field;
-          ev.dir = dir;
-          ev.data = sorted;
+          if (!field) return;
+
+          const currentData = this.brick.options.get('store.data', []);
+          const sorted = this._sortRows(currentData, field, dir, payload.compare);
+
+          this.brick.options.setSilent('store.data', sorted);
+          ev.data = { data: sorted, field: field, dir: dir };
         }
       }
     }
   ],
 
-  init: function () { },
+  init: function () {
+    // Extension initialized
+  },
 
-  destroy: function () { }
+  destroy: function () {
+    // Cleanup if needed
+  }
 };
 
-
 export default store;
-

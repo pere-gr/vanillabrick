@@ -8,15 +8,19 @@ export const tableColumns = {
       return this.options.get("table.columns", []);
     },
     sort: function (field, dir) {
+      if (!field) return;
       const cols = this.brick.columns.get();
       const colDef = cols.find(function (c) { return c && c.datafield === field; }) || {};
-      const state = this.options.get("table.sort", { field: null, dir: null });
+      const state = this.brick.options.get("table.sort", { field: null, dir: null });
+
       let nextDir = dir;
       if (nextDir !== 'asc' && nextDir !== 'desc') {
         nextDir = (state.field === field && state.dir === 'asc') ? 'desc' : 'asc';
       }
 
-      this.events.fire('store:data:sort', {
+      console.info(`[table-columns] Sorting field: ${field}, nextDir: ${nextDir}`);
+
+      this.brick.events.fire('store:data:sort', {
         field: field,
         dir: nextDir,
         compare: typeof colDef.sort === 'function' ? colDef.sort : null
@@ -51,6 +55,8 @@ export const tableColumns = {
           for (let i = 0; i < columns.length; i += 1) {
             const col = columns[i] || {};
             const th = html.create('th', { text: col.label || col.datafield || '' });
+            html.attr(th, 'data-field', col.datafield); // Store field name for easy access/styling
+
             if (col.sortable && col.datafield) {
               th.classList.add('vb-sortable');
               html.on(th, 'click', (function (colDef) {
@@ -87,7 +93,22 @@ export const tableColumns = {
       for: 'store:data:sort',
       after: {
         fn: function (ev) {
-          this.brick.options.setSilent("table.sort", { field: ev.field, dir: ev.dir || 'asc' });
+          const html = this.brick.html;
+          const field = ev.data.field;
+          const dir = ev.data.dir || 'asc';
+
+          this.brick.options.set("table.sort", { field: field, dir: dir });
+
+          // Visual update for headers
+          const root = html.element();
+          if (!root) return;
+          const ths = root.querySelectorAll('th.vb-sortable');
+          ths.forEach(th => {
+            th.classList.remove('vb-sort-asc', 'vb-sort-desc');
+            if (html.attr(th, 'data-field') === field) {
+              th.classList.add(dir === 'desc' ? 'vb-sort-desc' : 'vb-sort-asc');
+            }
+          });
         }
       }
     }
@@ -100,9 +121,9 @@ export const tableColumns = {
   options: {
     table: {
       columns: [
-        { datafield: 'code', label: 'Code', sortable: true },
-        { datafield: 'name', label: 'Name', sortable: true },
-        { datafield: 'key', label: 'Key', sortable: false },
+        { datafield: 'userId', label: 'userid', sortable: true },
+        { datafield: 'title', label: 'title', sortable: true },
+        { datafield: 'id', label: 'id', sortable: false, isKey: true },
       ]
     }
   }

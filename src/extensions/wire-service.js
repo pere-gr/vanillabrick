@@ -4,7 +4,16 @@ export const wireservice = {
     ns: 'wire',
     options: {},
 
-    brick: {},
+    brick: {
+        phase: async function(phase, eventName, ev){
+            await this.brick._controllers.events._firePhase(
+              this.brick,
+              phase,
+              eventName,
+              ev
+            );
+        }
+    },
     events: [
         {
             for: 'wire:notify:out',

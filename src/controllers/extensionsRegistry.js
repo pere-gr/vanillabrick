@@ -138,22 +138,35 @@ const ExtensionsRegistry = {
    * Aquesta funció es crida una vegada per tipus d'extensió per generar els "motlles".
    */
   _bake: function (defs) {
+    if (!this._bakedCache) this._bakedCache = {};
     const prototypes = {};
 
     for (let i = 0; i < defs.length; i++) {
       const def = defs[i];
       const name = def.name || def.ext.ns;
 
+      if (this._bakedCache[name]) {
+        prototypes[name] = this._bakedCache[name];
+        continue;
+      }
+
       // 1. Prototype for the extension context (ctxExt)
       // Contains the extension definition and helper methods.
-      // 'brick' will be assigned at instantiation time.
       const protoExt = {
         _name: name,
         _def: def.ext
       };
 
+      // Zero-bind getters for core APIs
+      Object.defineProperties(protoExt, {
+        "options": { get: function () { return this.brick ? this.brick.options : null; } },
+        "events": { get: function () { return this.brick ? this.brick.events : null; } },
+        "status": { get: function () { return this.brick ? this.brick.status : null; } },
+        "ext": { get: function () { return this; } },
+        "_ctx": { get: function () { return this; } }
+      });
+
       // Bake internal extension methods into the prototype
-      // This ensures 'this._helper()' works inside init/destroy/handlers
       if (def.ext.extension && typeof def.ext.extension === 'object') {
         for (const k in def.ext.extension) {
           if (typeof def.ext.extension[k] === 'function') {
@@ -211,6 +224,7 @@ const ExtensionsRegistry = {
         ext: protoExt,
         api: protoApi
       };
+      this._bakedCache[name] = prototypes[name];
     }
 
     return prototypes;

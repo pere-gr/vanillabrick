@@ -24,7 +24,7 @@ function Brick(options) {
   const opts = options && typeof options === "object" ? Object.assign({}, options) : {};
   opts.id = opts.id || this._nextId();
   opts.host = (opts.host || "brick").toLowerCase();
-  opts.kind = (opts.kind || "brick").toLowerCase();
+  opts.kind = (opts.kind || "unknown").toLowerCase();
   Object.defineProperty(this, "id", {
     value: opts.id,
     writable: false,
@@ -197,8 +197,8 @@ var ExtensionsRegistry = {
       status[name] = "visiting";
       const reqs = candidate.ext.requires || candidate.ext._requires;
       if (Array.isArray(reqs)) {
-        for (let i2 = 0; i2 < reqs.length; i2++) {
-          const depName = reqs[i2];
+        for (let i = 0; i < reqs.length; i++) {
+          const depName = reqs[i];
           if (!visit(depName)) {
             status[name] = "missing";
             return false;
@@ -220,14 +220,37 @@ var ExtensionsRegistry = {
    * Aquesta funció es crida una vegada per tipus d'extensió per generar els "motlles".
    */
   _bake: function(defs) {
+    if (!this._bakedCache)
+      this._bakedCache = {};
     const prototypes = {};
-    for (let i2 = 0; i2 < defs.length; i2++) {
-      const def = defs[i2];
+    for (let i = 0; i < defs.length; i++) {
+      const def = defs[i];
       const name = def.name || def.ext.ns;
+      if (this._bakedCache[name]) {
+        prototypes[name] = this._bakedCache[name];
+        continue;
+      }
       const protoExt = {
         _name: name,
         _def: def.ext
       };
+      Object.defineProperties(protoExt, {
+        "options": { get: function() {
+          return this.brick ? this.brick.options : null;
+        } },
+        "events": { get: function() {
+          return this.brick ? this.brick.events : null;
+        } },
+        "status": { get: function() {
+          return this.brick ? this.brick.status : null;
+        } },
+        "ext": { get: function() {
+          return this;
+        } },
+        "_ctx": { get: function() {
+          return this;
+        } }
+      });
       if (def.ext.extension && typeof def.ext.extension === "object") {
         for (const k in def.ext.extension) {
           if (typeof def.ext.extension[k] === "function") {
@@ -267,6 +290,7 @@ var ExtensionsRegistry = {
         ext: protoExt,
         api: protoApi
       };
+      this._bakedCache[name] = prototypes[name];
     }
     return prototypes;
   }
@@ -378,8 +402,8 @@ __export(options_exports, {
 });
 function mergeOptions() {
   const result = {};
-  for (let i2 = 0; i2 < arguments.length; i2++) {
-    const source = arguments[i2];
+  for (let i = 0; i < arguments.length; i++) {
+    const source = arguments[i];
     if (!source || typeof source !== "object")
       continue;
     for (const key in source) {
@@ -403,10 +427,10 @@ function getOption(obj, path) {
     return obj[path];
   const parts = path.split(".");
   let current = obj;
-  for (let i2 = 0; i2 < parts.length; i2++) {
+  for (let i = 0; i < parts.length; i++) {
     if (current === void 0 || current === null)
       return void 0;
-    current = current[parts[i2]];
+    current = current[parts[i]];
   }
   return current;
 }
@@ -415,8 +439,8 @@ function setOption(obj, path, value) {
     return;
   const parts = path.split(".");
   let current = obj;
-  for (let i2 = 0; i2 < parts.length - 1; i2++) {
-    const p = parts[i2];
+  for (let i = 0; i < parts.length - 1; i++) {
+    const p = parts[i];
     if (current[p] === void 0 || current[p] === null) {
       current[p] = {};
     }
@@ -452,7 +476,7 @@ OptionsController.prototype.init = function(brick, initialOptions) {
       return self.has(brick, key);
     },
     all: function() {
-      self.all(brick);
+      return self.all(brick);
     },
     setSilent: function(key, value) {
       self.setSilent(brick, key, value);
@@ -574,11 +598,12 @@ EventBusController.prototype._validateEventName = function(eventName) {
     return false;
   }
   const parts = eventName.split(":");
-  if (parts.length !== 3) {
-    console.error('[EventBus] Invalid event name format. Expected exactly "namespace:type:target" (3 segments). Got:', eventName);
+  if (parts.length < 3) {
+    console.error('[EventBus] Invalid event name format. Expected "namespace:type:target". Got:', eventName);
     return false;
   }
-  if (!parts[0] || parts[0] === "*" || !parts[1] || parts[1] === "*" || !parts[2] || parts[2] === "*") {
+  const target = parts.slice(2).join(":");
+  if (!parts[0] || parts[0] === "*" || !parts[1] || parts[1] === "*" || !target || target === "*") {
     console.error("[EventBus] Invalid event name for dispatch. Wildcards (*) and empty segments are not allowed in namespace, type, or target.", eventName);
     return false;
   }
@@ -598,8 +623,8 @@ EventBusController.prototype._getHandlersForEvent = function(brick, eventName, p
       on: [],
       after: []
     };
-    for (let i2 = 0; i2 < state.handlers.length; i2 += 1) {
-      const h = state.handlers[i2];
+    for (let i = 0; i < state.handlers.length; i += 1) {
+      const h = state.handlers[i];
       if (this._matches(h.compiled, key)) {
         if (handlersByPhase[h.phase]) {
           handlersByPhase[h.phase].push(h);
@@ -650,15 +675,15 @@ EventBusController.prototype.off = function(brick, pattern, phase, handler) {
   if (!brick || !brick._runtime || !brick._runtime.events)
     return;
   const state = brick._runtime.events;
-  for (let i2 = state.handlers.length - 1; i2 >= 0; i2 -= 1) {
-    const h = state.handlers[i2];
+  for (let i = state.handlers.length - 1; i >= 0; i -= 1) {
+    const h = state.handlers[i];
     if (pattern && h.pattern !== pattern)
       continue;
     if (phase && h.phase !== phase)
       continue;
     if (handler && h.handler !== handler)
       continue;
-    state.handlers.splice(i2, 1);
+    state.handlers.splice(i, 1);
   }
   state.dispatchCache = {};
 };
@@ -667,10 +692,10 @@ EventBusController.prototype._firePhase = async function(brick, phase, eventName
   ev.stopPhase = false;
   const phaseHandlers = this._getHandlersForEvent(brick, eventName, phase);
   const runtime = globalThis.VanillaBrick ? globalThis.VanillaBrick.runtime : null;
-  for (let i2 = 0; i2 < phaseHandlers.length; i2 += 1) {
+  for (let i = 0; i < phaseHandlers.length; i += 1) {
     if (ev.stopPhase)
       break;
-    const h = phaseHandlers[i2];
+    const h = phaseHandlers[i];
     const hnd = h.handler;
     try {
       let r;
@@ -794,8 +819,8 @@ ExtensionsController.prototype.applyAll = function(brick) {
     const kind = (brick.kind || "").toLowerCase();
     const coreDefaults = [];
     const extDefaults = [];
-    for (let i2 = 0; i2 < defs.length; i2 += 1) {
-      const def = defs[i2];
+    for (let i = 0; i < defs.length; i += 1) {
+      const def = defs[i];
       const defOpts = def.ext.options || def.ext._options;
       if (!defOpts)
         continue;
@@ -812,8 +837,8 @@ ExtensionsController.prototype.applyAll = function(brick) {
       brick._runtime.options.cache = {};
     }
   }
-  for (let i2 = 0; i2 < defs.length; i2 += 1) {
-    this._install(brick, defs[i2]);
+  for (let i = 0; i < defs.length; i += 1) {
+    this._install(brick, defs[i]);
   }
   this._ensureDestroyHook(brick);
 };
@@ -835,22 +860,13 @@ ExtensionsController.prototype._install = function(brick, def) {
   if (protos && protos.ext) {
     ctxExt = Object.create(protos.ext);
     ctxExt.brick = brick;
-    ctxExt.ext = ctxExt;
-    ctxExt._ctx = ctxExt;
   } else {
-    const ext = {
+    ctxExt = {
+      brick,
       name,
-      def: def.ext,
-      brick
+      def: def.ext
     };
-    ctxExt = Object.create(ext);
-    ctxExt.brick = brick;
-    ctxExt.ext = ext;
-    ctxExt._ctx = ctxExt;
   }
-  Object.defineProperty(ctxExt, "options", { value: brick.options, writable: false, enumerable: false, configurable: true });
-  Object.defineProperty(ctxExt, "events", { value: brick.events, writable: false, enumerable: false, configurable: true });
-  Object.defineProperty(ctxExt, "status", { value: brick.status, writable: false, enumerable: false, configurable: true });
   const ctxApi = ctxExt;
   if (!protos) {
     if (def.ext.extension && typeof def.ext.extension === "object") {
@@ -940,14 +956,7 @@ ExtensionsController.prototype._install = function(brick, def) {
             phase,
             fnName: desc.fn.name || "anon"
           };
-          const handler = function(ev) {
-            const args = [ev];
-            if (runtime && typeof runtime.execute === "function") {
-              return runtime.execute(desc.fn, ctxExt, args, meta);
-            }
-            return desc.fn.apply(ctxExt, args);
-          };
-          brick.events.on(pattern, phase, pr, handler, { ext: name, fn: desc.fn.name });
+          brick.events.on(pattern, phase, pr, { fn: desc.fn, ctx: ctxExt, meta });
         });
       }
     }
@@ -1052,8 +1061,8 @@ function setupBootstrap(VanillaBrick2) {
     if (!root.querySelectorAll)
       return;
     const scripts = root.querySelectorAll('script[type="application/json"][data-brick]');
-    for (let i2 = 0; i2 < scripts.length; i2 += 1) {
-      const node = scripts[i2];
+    for (let i = 0; i < scripts.length; i += 1) {
+      const node = scripts[i];
       const raw = node.textContent || "";
       if (!raw.trim())
         continue;
@@ -1071,7 +1080,7 @@ function setupBootstrap(VanillaBrick2) {
           VanillaBrick2.configs[key] = Object.assign({}, base, next);
         }
       } catch (err) {
-        console.warn("VanillaBrick: invalid JSON in data-brick config", err);
+        console.warn("VanillaBrick: invalid JSON in data-brick config", err, node);
       }
     }
   }
@@ -1087,26 +1096,27 @@ function setupBootstrap(VanillaBrick2) {
     if (el.__brickInstance)
       return el.__brickInstance;
     const opts = {};
-    const config = el.id && VanillaBrick2.configs ? VanillaBrick2.configs[el.id] : null;
+    const elId = el.getAttribute && el.getAttribute("id");
+    const config = elId && VanillaBrick2.configs ? VanillaBrick2.configs[elId] : null;
     if (config && typeof config === "object") {
       Object.assign(opts, config);
     }
-    if (el.id) {
-      opts.id = el.id;
+    if (elId) {
+      opts.id = elId;
     }
     const kind = readKind(el);
     if (kind) {
       opts.kind = kind;
     }
     opts.html = {
-      id: el.id || null,
+      id: elId || null,
       element: el
     };
     const brick = new VanillaBrick2.brick(opts);
     el.__brickInstance = brick;
     registry.list.push(brick);
     registry.byId[brick.id] = brick;
-    console.log("Brick", el.id, brick);
+    console.log("Brick", elId, brick);
     return brick;
   }
   function bootstrap(root) {
@@ -1118,8 +1128,8 @@ function setupBootstrap(VanillaBrick2) {
     loadConfigs(scope);
     const nodes = scope.querySelectorAll(".vb");
     const created = [];
-    for (let i2 = 0; i2 < nodes.length; i2++) {
-      const brick = createBrickFromElement(nodes[i2]);
+    for (let i = 0; i < nodes.length; i++) {
+      const brick = createBrickFromElement(nodes[i]);
       if (brick)
         created.push(brick);
     }
@@ -1290,8 +1300,8 @@ var htmlEvents = {
         return;
       const hasType = typeof type === "string" && type.length > 0;
       const hasHandler = typeof handler === "function";
-      for (let i2 = listeners.length - 1; i2 >= 0; i2--) {
-        const ln = listeners[i2];
+      for (let i = listeners.length - 1; i >= 0; i--) {
+        const ln = listeners[i];
         if (!ln || ln.el !== el)
           continue;
         if (hasType && ln.type !== type)
@@ -1299,7 +1309,7 @@ var htmlEvents = {
         if (hasHandler && ln.handler !== handler)
           continue;
         el.removeEventListener(ln.type, ln.handler, ln.options);
-        listeners.splice(i2, 1);
+        listeners.splice(i, 1);
       }
       this.brick.options.setSilent("html.listeners", listeners);
     }
@@ -1324,8 +1334,8 @@ var htmlEvents = {
             { type: "mousedown", eventName: "html:event:mousedown" },
             { type: "mouseup", eventName: "html:event:mouseup" }
           ];
-          for (let i2 = 0; i2 < defaultMap.length; i2 += 1) {
-            const entry = defaultMap[i2];
+          for (let i = 0; i < defaultMap.length; i += 1) {
+            const entry = defaultMap[i];
             const handler = function handler2(domEvent) {
               self.brick.events.fire(entry.eventName, {
                 domEvent,
@@ -1347,8 +1357,8 @@ var htmlEvents = {
           const listeners = this.brick.options.get("html.events.listeners", []);
           if (!Array.isArray(listeners))
             return;
-          for (let i2 = 0; i2 < listeners.length; i2 += 1) {
-            const ln = listeners[i2];
+          for (let i = 0; i < listeners.length; i += 1) {
+            const ln = listeners[i];
             this.brick.html.off(el, ln.type, ln.handler, ln.options);
           }
         }
@@ -1497,8 +1507,8 @@ var htmlRender = {
       while (walker.nextNode()) {
         const node = walker.currentNode;
         const attrs = Array.prototype.slice.call(node.attributes || []);
-        for (let i2 = 0; i2 < attrs.length; i2++) {
-          const a = attrs[i2];
+        for (let i = 0; i < attrs.length; i++) {
+          const a = attrs[i];
           const name = a.name.toLowerCase();
           const val = a.value || "";
           if (name.startsWith("on")) {
@@ -1583,10 +1593,10 @@ var html = {
       const listeners = this.options.get("html.listeners", []);
       if (!Array.isArray(listeners))
         return;
-      for (let i2 = listeners.length - 1; i2 >= 0; i2 -= 1) {
-        const ln = listeners[i2];
+      for (let i = listeners.length - 1; i >= 0; i -= 1) {
+        const ln = listeners[i];
         if (ln.type === type && ln.handler === handler) {
-          listeners.splice(i2, 1);
+          listeners.splice(i, 1);
         }
       }
       this.options.setSilent("html.listeners", listeners);
@@ -1642,8 +1652,8 @@ var html = {
     const listeners = this.brick.options.get("html.listeners", null);
     ;
     if (el && Array.isArray(listeners)) {
-      for (let i2 = 0; i2 < listeners.length; i2 += 1) {
-        const ln = listeners[i2];
+      for (let i = 0; i < listeners.length; i += 1) {
+        const ln = listeners[i];
         if (ln && ln.type && ln.handler) {
           el.removeEventListener(ln.type, ln.handler, ln.options);
         }
@@ -1652,6 +1662,300 @@ var html = {
   }
 };
 var html_default = html;
+
+// src/extensions/store-local.js
+var storeLocal = {
+  for: [{ host: "brick", kind: "*" }],
+  requires: ["store"],
+  ns: "store",
+  options: {},
+  /**
+   * No additional public API - uses store.js API
+   */
+  brick: {},
+  extension: {
+    _masterData: null,
+    _isEnabled: function() {
+      const type = this.brick.options.get("store.type", "local");
+      return type === "local" || type === "" || type === null || type === void 0;
+    },
+    /**
+     * Cache initial data from options
+     */
+    _initMasterData: function() {
+      if (this._masterData)
+        return;
+      const initial = this.brick.options.get("store.data", []);
+      this._masterData = Array.isArray(initial) ? initial.slice() : [];
+    }
+  },
+  events: [
+    {
+      for: "brick:status:ready",
+      on: {
+        priority: 1,
+        // High priority to grab data before store.load clears it
+        fn: function() {
+          if (!this._isEnabled())
+            return;
+          this._initMasterData();
+        }
+      }
+    },
+    {
+      for: "store:data:load",
+      on: {
+        priority: 5,
+        fn: function(ev) {
+          if (!this._isEnabled())
+            return;
+          const data = this._masterData || [];
+          this.brick.store.set(data);
+          this.brick.options.setSilent("store.totalCount", data.length);
+          ev.data = { data, source: "local", count: data.length };
+        }
+      }
+    },
+    {
+      // Handle ensure requests (trivial for local, but needed for consistency)
+      for: "store:data:ensure",
+      on: {
+        fn: function(ev) {
+          if (!this._isEnabled())
+            return;
+          if (!this._masterData)
+            return;
+          const start = ev.data.start || 0;
+          const count = ev.data.count || 1;
+          const slice = this._masterData.slice(start, start + count);
+          this.brick.store.set(slice, start);
+        }
+      }
+    }
+  ],
+  init: function() {
+  },
+  destroy: function() {
+  }
+};
+var store_local_default = storeLocal;
+
+// src/extensions/store-remote.js
+var storeRemote = {
+  for: [{ host: "brick", kind: "*" }],
+  requires: ["store"],
+  ns: "store",
+  options: {},
+  /**
+   * No additional public API - uses store.js API
+   */
+  brick: {},
+  /**
+   * Private extension helpers
+   */
+  extension: {
+    /**
+     * Check if this strategy should handle the request
+     * @returns {boolean}
+     */
+    _isEnabled: function() {
+      const type = this.brick.options.get("store.type", "");
+      return type === "remote";
+    },
+    /**
+     * Fetch data from remote URL
+     * @param {Object} query - Query parameters
+     * @param {string} query.url - URL to fetch from
+     * @returns {Promise<Array>}
+     */
+    _fetchData: async function(query) {
+      if (!query || !query.url) {
+        console.warn("[store-remote] No URL configured for remote store");
+        return [];
+      }
+      const config = this.brick.options.get("store.pagination", {});
+      const mode = config.mode || "client";
+      const params = config.params || {};
+      const keyOffset = params.offset || "offset";
+      const keyLimit = params.limit || "limit";
+      const urlObj = new URL(query.url, window.location.origin);
+      if (mode === "server") {
+        if (typeof query.start === "number")
+          urlObj.searchParams.append(keyOffset, query.start);
+        if (typeof query.count === "number")
+          urlObj.searchParams.append(keyLimit, query.count);
+      } else {
+      }
+      const res = await fetch(urlObj.toString());
+      if (!res.ok) {
+        throw new Error("[store-remote] HTTP " + res.status + " fetching " + urlObj.toString());
+      }
+      return await res.json();
+    }
+  },
+  /**
+   * Event handlers
+   */
+  events: [
+    {
+      for: "store:data:load",
+      on: {
+        priority: 5,
+        fn: async function(ev) {
+          if (!this._isEnabled())
+            return;
+          const config = this.brick.options.get("store", {});
+          const pageSize = config.pagination && config.pagination.pageSize ? config.pagination.pageSize : config.pageSize || 50;
+          const query = {
+            url: config.url || null,
+            start: 0,
+            count: pageSize
+          };
+          try {
+            const result = await this._fetchData(query);
+            let items = [];
+            let remoteTotal = null;
+            if (Array.isArray(result)) {
+              items = result;
+            } else if (result && result.data && Array.isArray(result.data)) {
+              items = result.data;
+              if (typeof result.total === "number")
+                remoteTotal = result.total;
+              else if (typeof result.totalCount === "number")
+                remoteTotal = result.totalCount;
+              else if (typeof result.count === "number")
+                remoteTotal = result.count;
+            }
+            let finalTotal = 0;
+            const configuredDefault = this.brick.options.get("store.defaultTotalCount", 0);
+            const currentTotal = this.brick.options.get("store.totalCount", 0);
+            const isServerMode = this.brick.options.get("store.pagination.mode") === "server";
+            if (remoteTotal !== null) {
+              finalTotal = remoteTotal;
+            } else if (!isServerMode) {
+              finalTotal = items.length;
+            } else {
+              if (configuredDefault > 0) {
+                finalTotal = configuredDefault;
+              } else {
+                finalTotal = Math.max(currentTotal, items.length);
+              }
+            }
+            if (finalTotal > 0) {
+              this.brick.options.setSilent("store.totalCount", finalTotal);
+            }
+            this.brick.store.set(items, query.start || 0);
+            console.info(`[store-remote] Loaded ${items.length} items. Mode: ${isServerMode ? "Server" : "Client"}. Total set to: ${finalTotal}`);
+            ev.data = { data: items, source: "remote", url: query.url };
+          } catch (err) {
+            console.error("[store-remote] Load failed:", err);
+            ev.data = { data: [], source: "remote", error: err.message };
+            ev.cancel = true;
+          }
+        }
+      }
+    },
+    {
+      for: "store:data:ensure",
+      on: {
+        fn: async function(ev) {
+          if (!this._isEnabled())
+            return;
+          const config = this.brick.options.get("store", {});
+          const start = ev.data.start || 0;
+          const count = ev.data.count || 50;
+          const query = {
+            url: config.url,
+            start,
+            count
+          };
+          try {
+            const result = await this._fetchData(query);
+            let items = [];
+            if (Array.isArray(result)) {
+              items = result;
+            } else if (result && result.data && Array.isArray(result.data)) {
+              items = result.data;
+              const total = result.total || result.totalCount || result.count;
+              if (total && total !== this.brick.store.count()) {
+                this.brick.options.setSilent("store.totalCount", total);
+              }
+            }
+            this.brick.store.set(items, start);
+          } catch (err) {
+            console.error("[store-remote] Range load failed:", err);
+          }
+        }
+      }
+    }
+  ],
+  init: function() {
+  },
+  destroy: function() {
+  }
+};
+var store_remote_default = storeRemote;
+
+// src/extensions/store-sort.js
+var storeSort = {
+  for: [{ host: "brick", kind: "*" }],
+  requires: ["store"],
+  ns: "storeSort",
+  // Namespace to avoid collision (optional, usually extensions don't need ns unless exposing API)
+  // No public API exposed on brick directly, works via events
+  brick: {},
+  extension: {
+    _canSortLocally: function() {
+      const type = this.brick.options.get("store.type", "local");
+      const mode = this.brick.options.get("store.pagination.mode", "client");
+      if (type === "local" || type === "memory")
+        return true;
+      if (type === "remote" && mode === "client")
+        return true;
+      return false;
+    }
+  },
+  events: [
+    {
+      for: "store:data:sort",
+      on: {
+        fn: function(ev) {
+          if (!this._canSortLocally())
+            return;
+          const field = ev.data.field;
+          const dir = ev.data.dir || "asc";
+          console.info(`[store-sort] Sorting locally by ${field} (${dir})`);
+          const data = this.brick.store.data() || [];
+          const compareFn = ev.compare || function(a, b) {
+            if (a === void 0 || a === null)
+              return 1;
+            if (b === void 0 || b === null)
+              return -1;
+            const va = a[field];
+            const vb = b[field];
+            if (typeof va === "string" && typeof vb === "string") {
+              return dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+            }
+            if (va < vb)
+              return dir === "asc" ? -1 : 1;
+            if (va > vb)
+              return dir === "asc" ? 1 : -1;
+            return 0;
+          };
+          data.sort(compareFn);
+          this.brick.store.set(data);
+          this.brick.events.fire("store:data:updated", { source: "sort", field, dir });
+          this.brick.events.fire("table:rows:render");
+        }
+      }
+    }
+  ],
+  init: function() {
+  },
+  destroy: function() {
+  }
+};
+var store_sort_default = storeSort;
 
 // src/extensions/store.js
 var DATA_SAMPLE_ROWS = [
@@ -1664,208 +1968,257 @@ var DATA_SAMPLE_ROWS = [
   { code: "7", name: "seven", key: 7 },
   { code: "8", name: "eight", key: 8 },
   { code: "9", name: "nine", key: 9 },
-  { code: "10", name: "ten", key: 10 },
-  { code: "11", name: "eleven", key: 11 },
-  { code: "12", name: "twelve", key: 12 },
-  { code: "13", name: "thirteen", key: 13 },
-  { code: "14", name: "fourteen", key: 14 },
-  { code: "15", name: "fifteen", key: 15 },
-  { code: "16", name: "sixteen", key: 16 },
-  { code: "17", name: "seventeen", key: 17 },
-  { code: "18", name: "eighteen", key: 18 },
-  { code: "19", name: "nineteen", key: 19 },
-  { code: "20", name: "twenty", key: 20 },
-  { code: "21", name: "twenty-one", key: 21 },
-  { code: "22", name: "twenty-two", key: 22 },
-  { code: "23", name: "twenty-three", key: 23 },
-  { code: "24", name: "twenty-four", key: 24 },
-  { code: "25", name: "twenty-five", key: 25 },
-  { code: "26", name: "twenty-six", key: 26 },
-  { code: "27", name: "twenty-seven", key: 27 },
-  { code: "28", name: "twenty-eight", key: 28 },
-  { code: "29", name: "twenty-nine", key: 29 },
-  { code: "30", name: "thirty", key: 30 },
-  { code: "31", name: "thirty-one", key: 31 },
-  { code: "32", name: "thirty-two", key: 32 },
-  { code: "33", name: "thirty-three", key: 33 },
-  { code: "34", name: "thirty-four", key: 34 },
-  { code: "35", name: "thirty-five", key: 35 },
-  { code: "36", name: "thirty-six", key: 36 },
-  { code: "37", name: "thirty-seven", key: 37 },
-  { code: "38", name: "thirty-eight", key: 38 },
-  { code: "39", name: "thirty-nine", key: 39 },
-  { code: "40", name: "forty", key: 40 },
-  { code: "41", name: "forty-one", key: 41 },
-  { code: "42", name: "forty-two", key: 42 },
-  { code: "43", name: "forty-three", key: 43 },
-  { code: "44", name: "forty-four", key: 44 },
-  { code: "45", name: "forty-five", key: 45 },
-  { code: "46", name: "forty-six", key: 46 },
-  { code: "47", name: "forty-seven", key: 47 },
-  { code: "48", name: "forty-eight", key: 48 },
-  { code: "49", name: "forty-nine", key: 49 },
-  { code: "50", name: "fifty", key: 50 },
-  { code: "51", name: "fifty-one", key: 51 },
-  { code: "52", name: "fifty-two", key: 52 },
-  { code: "53", name: "fifty-three", key: 53 },
-  { code: "54", name: "fifty-four", key: 54 },
-  { code: "55", name: "fifty-five", key: 55 },
-  { code: "56", name: "fifty-six", key: 56 },
-  { code: "57", name: "fifty-seven", key: 57 },
-  { code: "58", name: "fifty-eight", key: 58 },
-  { code: "59", name: "fifty-nine", key: 59 },
-  { code: "60", name: "sixty", key: 60 },
-  { code: "61", name: "sixty-one", key: 61 },
-  { code: "62", name: "sixty-two", key: 62 },
-  { code: "63", name: "sixty-three", key: 63 },
-  { code: "64", name: "sixty-four", key: 64 },
-  { code: "65", name: "sixty-five", key: 65 },
-  { code: "66", name: "sixty-six", key: 66 },
-  { code: "67", name: "sixty-seven", key: 67 },
-  { code: "68", name: "sixty-eight", key: 68 },
-  { code: "69", name: "sixty-nine", key: 69 },
-  { code: "70", name: "seventy", key: 70 },
-  { code: "71", name: "seventy-one", key: 71 },
-  { code: "72", name: "seventy-two", key: 72 },
-  { code: "73", name: "seventy-three", key: 73 },
-  { code: "74", name: "seventy-four", key: 74 },
-  { code: "75", name: "seventy-five", key: 75 },
-  { code: "76", name: "seventy-six", key: 76 },
-  { code: "77", name: "seventy-seven", key: 77 },
-  { code: "78", name: "seventy-eight", key: 78 },
-  { code: "79", name: "seventy-nine", key: 79 },
-  { code: "80", name: "eighty", key: 80 },
-  { code: "81", name: "eighty-one", key: 81 },
-  { code: "82", name: "eighty-two", key: 82 },
-  { code: "83", name: "eighty-three", key: 83 },
-  { code: "84", name: "eighty-four", key: 84 },
-  { code: "85", name: "eighty-five", key: 85 },
-  { code: "86", name: "eighty-six", key: 86 },
-  { code: "87", name: "eighty-seven", key: 87 },
-  { code: "88", name: "eighty-eight", key: 88 },
-  { code: "89", name: "eighty-nine", key: 89 },
-  { code: "90", name: "ninety", key: 90 },
-  { code: "91", name: "ninety-one", key: 91 },
-  { code: "92", name: "ninety-two", key: 92 },
-  { code: "93", name: "ninety-three", key: 93 },
-  { code: "94", name: "ninety-four", key: 94 },
-  { code: "95", name: "ninety-five", key: 95 },
-  { code: "96", name: "ninety-six", key: 96 },
-  { code: "97", name: "ninety-seven", key: 97 },
-  { code: "98", name: "ninety-eight", key: 98 },
-  { code: "99", name: "ninety-nine", key: 99 },
-  { code: "100", name: "one hundred", key: 100 }
+  { code: "10", name: "ten", key: 10 }
 ];
 var store = {
-  for: [
-    { host: "brick", kind: "form" },
-    { host: "brick", kind: "table" }
-  ],
+  for: [{ host: "brick", kind: "*" }],
   requires: [],
   ns: "store",
-  options: {},
-  // API pública sobre el brick (this === brick)
-  brick: {
-    load: function() {
-      return this.brick.options.get("store.data", []);
-    },
-    set: function(data) {
-      if (data === null)
-        return;
-      const previous = this.brick.options.get("store.data", []);
-      data = Array.isArray(data) ? data.slice() : [data];
-      this.brick.events.fire("store:data:set", {
-        previous,
-        data
-      });
-      return data;
-    },
-    setAsync: async function(data) {
-      const previous = this.brick.options.get("store.data", []);
-      data = Array.isArray(data) ? data.slice() : [];
-      await this.brick.events.fireAsync("store:data:set", {
-        previous,
-        data
-      });
-      return data;
-    },
-    all: function() {
-      return this.brick.store.load();
-    },
-    get: function(index) {
-      const arr = this.brick.store.load();
-      if (typeof index !== "number")
-        return null;
-      if (index < 0 || index >= arr.length)
-        return null;
-      return arr[index];
+  options: {
+    store: {
+      type: "local",
+      // 'local' | 'remote'
+      uidField: "key",
+      data: []
     }
   },
-  // Helpers interns (this === ext)
+  /**
+   * Public Brick API (this = extension context with this.brick)
+   */
+  brick: {
+    /**
+     * Get the configured UID field name
+     * @returns {string}
+     */
+    uidField: function() {
+      return this.brick.options.get("store.uidField", "key");
+    },
+    /**
+     * Get current store data array (Sparse Array)
+     * @returns {Array}
+     */
+    data: function() {
+      return this.brick.options.get("store.data", []);
+    },
+    /**
+     * Get current store type
+     * @returns {string} 'memory' | 'local' | 'remote'
+     */
+    type: function() {
+      return this.brick.options.get("store.type", "memory");
+    },
+    /**
+     * Ensure a specific range of data is loaded.
+     * Fires 'store:data:ensure' if gaps are found.
+     * @param {number} start - Start index
+     * @param {number} count - Number of items
+     * @returns {Promise}
+     */
+    ensureRange: async function(start, count) {
+      const data = this.brick.options.get("store.data", []);
+      const total = this.brick.options.get("store.totalCount", 0);
+      if (total > 0 && start >= total)
+        return;
+      const effectiveCount = total > 0 ? Math.min(count, total - start) : count;
+      let hasGap = false;
+      for (let i = start; i < start + effectiveCount; i++) {
+        if (!data[i]) {
+          hasGap = true;
+          break;
+        }
+      }
+      if (hasGap) {
+        await this.brick.events.fireAsync("store:data:ensure", { start, count: effectiveCount });
+      }
+    },
+    /**
+     * Trigger full data load/reset
+     * @returns {Promise}
+     */
+    load: async function() {
+      this.brick.options.setSilent("store.data", []);
+      const defaultTotal = this.brick.options.get("store.defaultTotalCount", 0);
+      this.brick.options.setSilent("store.totalCount", defaultTotal);
+      return this.brick.events.fireAsync("store:data:load", {});
+    },
+    /**
+     * Set store data directly (updates specific range or full replace)
+     * @param {Array} rows - New data rowsv
+     * @param {number} [start=0] - Starting index (if partial update)
+     * @returns {Object} brick
+     */
+    set: function(rows, start) {
+      if (!rows)
+        return this.brick;
+      const newRows = Array.isArray(rows) ? rows : [rows];
+      const currentData = this.brick.options.get("store.data", []);
+      const total = this.brick.options.get("store.totalCount", 0);
+      let nextData;
+      if (typeof start === "number") {
+        nextData = currentData;
+        for (let i = 0; i < newRows.length; i++) {
+          nextData[start + i] = newRows[i];
+        }
+        if (nextData.length > total) {
+          this.brick.options.setSilent("store.totalCount", nextData.length);
+        }
+      } else {
+        nextData = newRows;
+        this.brick.options.setSilent("store.totalCount", nextData.length);
+      }
+      this.brick.options.setSilent("store.data", nextData);
+      this.brick.events.fire("store:data:updated", {
+        data: nextData,
+        start: start || 0,
+        count: newRows.length
+      });
+      return this.brick;
+    },
+    /**
+     * Get all records (careful with large sparse arrays)
+     * @returns {Array}
+     */
+    all: function() {
+      return this.brick.options.get("store.data", []);
+    },
+    /**
+     * Get record by index
+     * @param {number} index
+     * @returns {Object|null}
+     */
+    get: function(index) {
+      const arr = this.brick.options.get("store.data", []);
+      return arr[index] || null;
+    },
+    /**
+     * Get record by UID
+     * @param {*} uid
+     * @returns {Object|null}
+     */
+    find: function(uid) {
+      const arr = this.brick.options.get("store.data", []);
+      const field = this.brick.store.uidField();
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i] && arr[i][field] === uid)
+          return arr[i];
+      }
+      return null;
+    },
+    /**
+     * Get total record count
+     * @returns {number}
+     */
+    count: function() {
+      return this.brick.options.get("store.totalCount", 0);
+    },
+    /**
+     * Trigger sort operation
+     * @param {string} field
+     * @param {string} dir
+     * @param {Function} compareFn
+     */
+    sort: function(field, dir, compareFn) {
+      this.brick.events.fire("store:data:sort", {
+        field,
+        dir: dir || "asc",
+        compare: compareFn
+      });
+      return this.brick;
+    }
+  },
+  /**
+   * Private extension helpers (this = extension context)
+   */
   extension: {
+    /**
+     * Normalize value to array
+     * @param {*} value
+     * @param {Array} fallback
+     * @returns {Array}
+     */
     _normalizeArray: function(value, fallback) {
       if (Array.isArray(value))
         return value.slice();
       return Array.isArray(fallback) ? fallback.slice() : [];
     },
+    /**
+     * Sort rows by field
+     * @param {Array} rows
+     * @param {string} field
+     * @param {string} dir - 'asc' or 'desc'
+     * @param {Function} compareFn - Optional custom compare
+     * @returns {Array} sorted copy
+     */
     _sortRows: function(rows, field, dir, compareFn) {
       const arr = Array.isArray(rows) ? rows.slice() : [];
+      const direction = dir === "desc" ? -1 : 1;
       const cmp = typeof compareFn === "function" ? function(a, b) {
         return compareFn(a, b, dir);
       } : function(a, b) {
         const va = a && Object.prototype.hasOwnProperty.call(a, field) ? a[field] : void 0;
         const vb = b && Object.prototype.hasOwnProperty.call(b, field) ? b[field] : void 0;
-        let res = 0;
         if (va === vb)
-          res = 0;
-        else if (va === void 0 || va === null)
-          res = -1;
-        else if (vb === void 0 || vb === null)
-          res = 1;
-        else if (typeof va === "number" && typeof vb === "number")
-          res = va - vb;
-        else
-          res = String(va).localeCompare(String(vb));
-        return dir === "desc" ? -res : res;
+          return 0;
+        if (va === void 0 || va === null)
+          return -1 * direction;
+        if (vb === void 0 || vb === null)
+          return 1 * direction;
+        if (typeof va === "number" && typeof vb === "number")
+          return (va - vb) * direction;
+        return String(va).localeCompare(String(vb)) * direction;
       };
       arr.sort(cmp);
       return arr;
     }
   },
+  /**
+   * Event handlers
+   */
   events: [
+    // On brick ready, trigger store load
     {
       for: "brick:status:ready",
       on: {
-        fn: function(ev) {
-          const storeData = this._normalizeArray(DATA_SAMPLE_ROWS, []);
-          this.brick.options.setSilent("store.data", storeData);
+        priority: 5,
+        fn: function() {
+          const storeType = this.brick.options.get("store.type", "local");
+          const existingData = this.brick.options.get("store.data", null);
+          if (storeType === "local" && (!existingData || existingData.length === 0)) {
+            const sampleData = this._normalizeArray(DATA_SAMPLE_ROWS, []);
+            this.brick.options.setSilent("store.data", sampleData);
+          }
+          this.brick.store.load();
         }
       }
     },
+    // Handle store:data:set - persist data to options
     {
       for: "store:data:set",
       on: {
+        priority: 5,
         fn: function(ev) {
-          const payload = ev && ev.data || null;
-          const data = payload && payload.data ? payload.data : [];
+          const payload = ev && ev.data || {};
+          const data = payload.data || [];
           this.brick.options.setSilent("store.data", data);
+          ev.data = { data, previous: payload.previous };
         }
       }
     },
+    // Handle store:data:sort
     {
       for: "store:data:sort",
       on: {
+        priority: 5,
         fn: function(ev) {
           const payload = ev && ev.data || {};
-          const field = payload.field || null;
+          const field = payload.field;
           const dir = payload.dir || "asc";
-          if (!field || !this.brick)
+          if (!field)
             return;
-          const sorted = this._sortRows(this.brick.store.load(), field, dir, payload.compare);
+          const currentData = this.brick.options.get("store.data", []);
+          const sorted = this._sortRows(currentData, field, dir, payload.compare);
           this.brick.options.setSilent("store.data", sorted);
-          ev.field = field;
-          ev.dir = dir;
-          ev.data = sorted;
+          ev.data = { data: sorted, field, dir };
         }
       }
     }
@@ -1955,7 +2308,16 @@ var wireservice = {
   // No strict requirements
   ns: "wire",
   options: {},
-  brick: {},
+  brick: {
+    phase: async function(phase, eventName, ev) {
+      await this.brick._controllers.events._firePhase(
+        this.brick,
+        phase,
+        eventName,
+        ev
+      );
+    }
+  },
   events: [
     {
       for: "wire:notify:out",
@@ -1966,8 +2328,8 @@ var wireservice = {
           const evData = ev.data.data;
           const slaves = this.ext._slaves[master];
           if (slaves && slaves.length > 0) {
-            for (let i2 = 0; i2 < slaves.length; i2++) {
-              slaves[i2].brick.events.fire(evName, evData);
+            for (let i = 0; i < slaves.length; i++) {
+              slaves[i].brick.events.fire(evName, evData);
             }
           }
         }
@@ -1994,17 +2356,17 @@ var wireservice = {
           this.ext._masters = {};
         if (this.ext._slaves == null)
           this.ext._slaves = {};
-        for (let i2 = 0; i2 < data.options.slaveOf.length; i2++) {
+        for (let i = 0; i < data.options.slaveOf.length; i++) {
           let master = this.ext._masters[data.brick.id];
           if (!master) {
             this.ext._masters[data.brick.id] = [];
           }
-          this.ext._masters[data.brick.id].push({ id: data.options.slaveOf[i2].id, kind: data.options.slaveOf[i2].kind });
-          let slave = this.ext._slaves[data.options.slaveOf[i2].id];
+          this.ext._masters[data.brick.id].push({ id: data.options.slaveOf[i].id, kind: data.options.slaveOf[i].kind });
+          let slave = this.ext._slaves[data.options.slaveOf[i].id];
           if (!slave) {
-            this.ext._slaves[data.options.slaveOf[i2].id] = [];
+            this.ext._slaves[data.options.slaveOf[i].id] = [];
           }
-          this.ext._slaves[data.options.slaveOf[i2].id].push({ id: data.brick.id, kind: data.brick.kind, brick: data.brick });
+          this.ext._slaves[data.options.slaveOf[i].id].push({ id: data.brick.id, kind: data.brick.kind, brick: data.brick });
         }
       }
     }
@@ -2030,8 +2392,8 @@ var formItems = {
         return [];
       const items = [];
       const groups = root.querySelectorAll(".vb-form-group");
-      for (let i2 = 0; i2 < groups.length; i2++) {
-        const groupEl = groups[i2];
+      for (let i = 0; i < groups.length; i++) {
+        const groupEl = groups[i];
         const group = {
           type: "group",
           items: []
@@ -2081,8 +2443,8 @@ var formItems = {
         return;
       html2.clear(root);
       const frag = html2.frag() || root.ownerDocument.createDocumentFragment();
-      for (let i2 = 0; i2 < items.length; i2++) {
-        const item = items[i2];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         if (item.type !== "group")
           continue;
         const groupEl = html2.create("div", { classList: ["vb-form-group"] });
@@ -2186,7 +2548,7 @@ var formRecord = {
   brick: {
     // We could expose methods to get/set the current record directly if needed
     getRecord: function() {
-      const data = this.store.load();
+      const data = this.brick.store.data();
       return data && data.length ? data[0] : null;
     }
   },
@@ -2196,8 +2558,8 @@ var formRecord = {
       if (!root)
         return;
       const inputs = root.querySelectorAll("input, select, textarea");
-      for (let i2 = 0; i2 < inputs.length; i2++) {
-        const input = inputs[i2];
+      for (let i = 0; i < inputs.length; i++) {
+        const input = inputs[i];
         const name = input.name || input.id;
         if (!name)
           continue;
@@ -2215,10 +2577,6 @@ var formRecord = {
       for: "brick:status:ready",
       on: {
         fn: function(ev) {
-          const data = this.brick.store.load();
-          if (data && data.length) {
-            this._bind(data[0]);
-          }
         }
       }
     },
@@ -2226,7 +2584,7 @@ var formRecord = {
       for: "store:data:*",
       after: {
         fn: function(ev) {
-          const data = this.brick.store.load();
+          const data = ev.data;
           const record = data && data.length ? data[0] : null;
           this._bind(record);
         }
@@ -2261,12 +2619,12 @@ var form = {
   brick: {
     // Basic form component methods can be added here
     submit: function() {
-      const el = this.dom.element();
+      const el = this.brick.html.element();
       if (el && typeof el.submit === "function")
         el.submit();
     },
     reset: function() {
-      const el = this.dom.element();
+      const el = this.brick.html.element();
       if (el && typeof el.reset === "function")
         el.reset();
     }
@@ -2303,9 +2661,10 @@ var statusBar = {
       after: {
         fn: function(ev) {
           const record = ev.data.row;
+          const uidField = ev.data.uidField;
           const el = this.brick.html.element();
           if (el) {
-            el.textContent = `Wire OK -> Selected: ${record.name}`;
+            el.textContent = `Wire OK -> Selected: ${record[uidField]}`;
           }
         }
       }
@@ -2329,16 +2688,19 @@ var tableColumns = {
       return this.options.get("table.columns", []);
     },
     sort: function(field, dir) {
+      if (!field)
+        return;
       const cols = this.brick.columns.get();
-      const colDef = cols.find(function(c2) {
-        return c2 && c2.datafield === field;
+      const colDef = cols.find(function(c) {
+        return c && c.datafield === field;
       }) || {};
-      const state = this.options.get("table.sort", { field: null, dir: null });
+      const state = this.brick.options.get("table.sort", { field: null, dir: null });
       let nextDir = dir;
       if (nextDir !== "asc" && nextDir !== "desc") {
         nextDir = state.field === field && state.dir === "asc" ? "desc" : "asc";
       }
-      this.events.fire("store:data:sort", {
+      console.info(`[table-columns] Sorting field: ${field}, nextDir: ${nextDir}`);
+      this.brick.events.fire("store:data:sort", {
         field,
         dir: nextDir,
         compare: typeof colDef.sort === "function" ? colDef.sort : null
@@ -2363,9 +2725,10 @@ var tableColumns = {
           const thead = html2.create("thead");
           const row = thead.insertRow();
           const brick = this.brick;
-          for (let i2 = 0; i2 < columns.length; i2 += 1) {
-            const col = columns[i2] || {};
+          for (let i = 0; i < columns.length; i += 1) {
+            const col = columns[i] || {};
             const th = html2.create("th", { text: col.label || col.datafield || "" });
+            html2.attr(th, "data-field", col.datafield);
             if (col.sortable && col.datafield) {
               th.classList.add("vb-sortable");
               html2.on(th, "click", /* @__PURE__ */ function(colDef) {
@@ -2401,7 +2764,20 @@ var tableColumns = {
       for: "store:data:sort",
       after: {
         fn: function(ev) {
-          this.brick.options.setSilent("table.sort", { field: ev.field, dir: ev.dir || "asc" });
+          const html2 = this.brick.html;
+          const field = ev.data.field;
+          const dir = ev.data.dir || "asc";
+          this.brick.options.set("table.sort", { field, dir });
+          const root = html2.element();
+          if (!root)
+            return;
+          const ths = root.querySelectorAll("th.vb-sortable");
+          ths.forEach((th) => {
+            th.classList.remove("vb-sort-asc", "vb-sort-desc");
+            if (html2.attr(th, "data-field") === field) {
+              th.classList.add(dir === "desc" ? "vb-sort-desc" : "vb-sort-asc");
+            }
+          });
         }
       }
     }
@@ -2413,9 +2789,9 @@ var tableColumns = {
   options: {
     table: {
       columns: [
-        { datafield: "code", label: "Code", sortable: true },
-        { datafield: "name", label: "Name", sortable: true },
-        { datafield: "key", label: "Key", sortable: false }
+        { datafield: "userId", label: "userid", sortable: true },
+        { datafield: "title", label: "title", sortable: true },
+        { datafield: "id", label: "id", sortable: false, isKey: true }
       ]
     }
   }
@@ -2466,6 +2842,8 @@ var tableRowsFocused = {
         fn: function(ev) {
           const html2 = this.brick.html;
           const tr = ev.data.tr;
+          if (tr == null)
+            return;
           html2.off(tr, "mousedown");
         }
       },
@@ -2473,6 +2851,12 @@ var tableRowsFocused = {
         fn: function(ev) {
           const html2 = this.brick.html;
           const tr = ev.data.tr;
+          const rowData = ev.data.row;
+          const uidField = this.brick.store.uidField();
+          const focusedId = this.brick.options.get("table.focusedId");
+          if (focusedId !== void 0 && rowData[uidField] === focusedId) {
+            this.brick.css.addClass(tr, "vb-focused");
+          }
           html2.on(tr, "mousedown", (e) => {
             var _a;
             const root = this.brick.html.element();
@@ -2481,7 +2865,8 @@ var tableRowsFocused = {
                 this.brick.css.removeClass(el, "vb-focused");
             });
             this.brick.css.addClass(tr, "vb-focused");
-            (_a = this.brick.wire) == null ? void 0 : _a.notify("dom:row:focus", { row: ev.data.row });
+            this.brick.options.set("table.focusedId", rowData[uidField]);
+            (_a = this.brick.wire) == null ? void 0 : _a.notify("dom:row:focus", { row: rowData, uidField });
           });
         }
       }
@@ -2501,15 +2886,16 @@ var tableRows = {
   ns: "rows",
   options: {},
   brick: {
-    render: function() {
+    render: function(ev) {
+      if (ev == null || ev.data == null)
+        return;
       const html2 = this.brick.html;
       const root = html2.element();
       if (!root)
         return;
       const t0 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
-      const rows = this.brick.store.load();
+      const rows = ev.data;
       const columns = this.brick.columns.get();
-      this.brick.events.fire("table:rows:data", { rows, columns });
       this.brick.events.fire("table:rows:render", { rows, columns });
     }
   },
@@ -2519,44 +2905,47 @@ var tableRows = {
       for: "brick:status:ready",
       on: {
         fn: function(ev) {
-          console.log("what happened?", ev.event.name);
-          this.brick.rows.render();
         }
       }
     },
     {
       for: "store:data:*",
       after: {
+        priority: 5,
+        // After virtual (priority 3)
         fn: function(ev) {
-          console.log("what happened?", ev.event.name);
-          this.brick.rows.render();
+          if (ev.virtualHandled)
+            return;
+          this.brick.rows.render(ev);
         }
       }
     },
     {
       for: "table:rows:render",
       before: {
-        priority: 0,
+        priority: 10,
+        // Low priority: Run AFTER extensions (like virtual scroll) have had a chance
         fn: function(ev) {
           const t0 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
           const html2 = this.brick.html;
           const items = this.brick.options.get("table.rows") || {};
-          const rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
+          const rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.data();
           const columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
-          for (let i2 = 0; i2 < rows.length; i2++) {
-            let item = items[rows[i2].key];
+          const uidField = this.brick.store.uidField();
+          for (let i = 0; i < rows.length; i++) {
+            let item = items[rows[i][uidField]];
             if (item == null) {
               item = {};
-              items[rows[i2].key] = item;
+              items[rows[i][uidField]] = item;
             }
-            item.row = rows[i2];
+            item.row = rows[i];
             let tr = item.tr || null;
             if (tr == null) {
               tr = html2.create("tr");
-              html2.attr(tr, "for", item.row.key);
-              items[item.row.key].tr = tr;
+              html2.attr(tr, "for", item.row[uidField]);
+              items[item.row[uidField]].tr = tr;
             }
-            for (c = 0; c < columns.length; c++) {
+            for (let c = 0; c < columns.length; c++) {
               let td = tr.children.length > 0 ? tr.children[c] : null;
               if (td == null) {
                 td = html2.create("td");
@@ -2569,7 +2958,7 @@ var tableRows = {
           this.brick.options.setSilent("table.rows", items);
           const t1 = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
           const ms = Math.round(t1 - t0);
-          console.warn("data created in...", ms, "ms");
+          console.warn("data created in...", ms, "ms", "total items:", Object.keys(items).length);
         }
       }
     },
@@ -2587,14 +2976,26 @@ var tableRows = {
           ev.data = ev.data || {};
           ev.data.t0 = t0;
           ev.data.items = items;
-          ev.data.rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
           ev.data.columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
           const table2 = root.tagName && root.tagName.toLowerCase() === "table" ? root : html2.get && html2.get("table") || root.querySelector && root.querySelector("table");
           if (!table2)
             return;
+          if (this.brick.options.get("table.virtual.enabled")) {
+            ev.virtualHandled = true;
+            ev.cancel = true;
+            return;
+          }
           const tbody = html2.detach(table2.querySelector("tbody"));
-          for (i = tbody.children.length; i >= 0; i--) {
-            html2.detach(tbody.children[i]);
+          if (tbody) {
+            for (let i = tbody.children.length - 1; i >= 0; i--) {
+              html2.detach(tbody.children[i]);
+            }
+          } else {
+            const newTbody = html2.create("tbody");
+            html2.append(table2, newTbody);
+            ev.data.table = table2;
+            ev.data.tbody = newTbody;
+            return;
           }
           ev.data.table = table2;
           ev.data.tbody = tbody;
@@ -2603,17 +3004,18 @@ var tableRows = {
       on: {
         fn: function(ev) {
           const data = ev.data || {};
-          const rows = Array.isArray(ev && ev.data && ev.data.rows) ? ev.data.rows : this.brick.store.load();
+          const rows = Array.isArray(ev && ev.data && ev.data.rows) ? ev.data.rows : this.brick.store.data();
           const columns = Array.isArray(ev && ev.data && ev.data.columns) ? ev.data.columns : this.brick.columns.get();
           data.columns = columns;
           data.rows = rows;
-          for (let i2 = 0; i2 < rows.length; i2 += 1) {
-            const item = ev.data.items[rows[i2].key];
-            const rowData = rows[i2] || {};
+          const uidField = this.brick.store.uidField();
+          for (let i = 0; i < rows.length; i += 1) {
+            const item = ev.data.items[rows[i][uidField]];
+            const rowData = rows[i] || {};
             this.brick.events.fire("table:row:render", {
               item,
               row: rowData,
-              rowIndex: i2,
+              rowIndex: i,
               tbody: ev.data.tbody,
               columns
             });
@@ -2707,79 +3109,354 @@ var tableRows = {
 };
 var table_rows_default = tableRows;
 
+// src/components/table-virtual.js
+var tableVirtual = {
+  for: [{ host: "brick", kind: "table" }],
+  requires: ["html", "store", "columns"],
+  ns: "virtual",
+  options: {
+    table: {
+      virtual: {
+        enabled: false,
+        pageSize: 25,
+        maxHeight: 400,
+        rowHeight: 33
+      }
+    }
+  },
+  brick: {
+    isEnabled: function() {
+      return this.brick.options.get("table.virtual.enabled", false) === true;
+    },
+    refresh: function() {
+      this._renderVisibleWindow();
+    }
+  },
+  extension: {
+    _wrapper: null,
+    _table: null,
+    _tbody: null,
+    _spacerTop: null,
+    _spacerBottom: null,
+    _currentPage: -1,
+    _rowHeight: 33,
+    _ticking: false,
+    _isEnabled: function() {
+      return this.brick.options.get("table.virtual.enabled", false) === true;
+    },
+    _initStructure: function() {
+      const html2 = this.brick.html;
+      const root = html2.element();
+      if (!root)
+        return false;
+      this._table = root.tagName && root.tagName.toLowerCase() === "table" ? root : root.querySelector("table");
+      if (!this._table)
+        return false;
+      this._table.style.position = "";
+      this._table.style.top = "";
+      this._table.style.transform = "";
+      this._table.style.width = "100%";
+      this._table.style.borderCollapse = "collapse";
+      const parent = this._table.parentNode;
+      if (parent && parent.classList && parent.classList.contains("vb-table-wrapper")) {
+        this._wrapper = parent;
+      } else {
+        this._wrapper = html2.create("div", { classList: ["vb-table-wrapper", "vb-virtual"] });
+        parent.insertBefore(this._wrapper, this._table);
+        this._wrapper.appendChild(this._table);
+      }
+      this._wrapper.style.maxHeight = this.brick.options.get("table.virtual.maxHeight", 400) + "px";
+      this._wrapper.style.overflowY = "auto";
+      this._wrapper.style.position = "relative";
+      const canvas = this._wrapper.querySelector(".vb-virtual-canvas");
+      if (canvas)
+        html2.detach(canvas);
+      const headerTable = this._wrapper.querySelector(".vb-virtual-header-table");
+      if (headerTable) {
+        const thead = headerTable.querySelector("thead");
+        if (thead)
+          this._table.insertBefore(thead, this._table.firstChild);
+        html2.detach(headerTable);
+      }
+      let tbody = this._table.querySelector("tbody");
+      if (!tbody) {
+        tbody = html2.create("tbody");
+        this._table.appendChild(tbody);
+      }
+      const tbodies = this._table.querySelectorAll("tbody");
+      if (tbodies.length > 1) {
+        for (let i = 1; i < tbodies.length; i++)
+          html2.detach(tbodies[i]);
+        tbody = tbodies[0];
+      }
+      this._tbody = tbody;
+      const ths = this._table.querySelectorAll("th");
+      ths.forEach((th) => {
+        th.style.position = "sticky";
+        th.style.top = "0";
+        th.style.zIndex = "2";
+        if (!th.style.backgroundColor)
+          th.style.backgroundColor = "#f8f9fa";
+      });
+      return true;
+    },
+    _updateCanvas: function() {
+      this._renderVisibleWindow();
+    },
+    _renderVisibleWindow: function() {
+      const scrollTop = this._wrapper.scrollTop;
+      const pageSize = this.brick.options.get("table.virtual.pageSize", 50);
+      this._rowHeight = this.brick.options.get("table.virtual.rowHeight", 33);
+      const totalCount = this.brick.store.count() || 0;
+      const startRowComplete = Math.floor(scrollTop / this._rowHeight);
+      let startRow = Math.max(0, startRowComplete - pageSize / 2);
+      startRow = Math.floor(startRow / pageSize) * pageSize;
+      const windowSize = pageSize;
+      const index = Math.floor(scrollTop / this._rowHeight);
+      let renderStart = Math.floor(index / (windowSize / 2)) * (windowSize / 2);
+      const pageNum = Math.floor(scrollTop / (pageSize * this._rowHeight));
+      const maxPage = Math.ceil(totalCount / pageSize) - 1;
+      const targetPage = Math.min(maxPage, Math.max(0, pageNum));
+      const renderPageStart = Math.max(0, targetPage - 1);
+      const renderPageEnd = Math.min(maxPage, targetPage + 1);
+      const startIndex = renderPageStart * pageSize;
+      let endIndex = (renderPageEnd + 1) * pageSize;
+      if (endIndex > totalCount)
+        endIndex = totalCount;
+      this._renderRows(startIndex, endIndex, totalCount);
+    },
+    _renderRows: function(startIndex, endIndex, totalCount) {
+      const html2 = this.brick.html;
+      const itemMap = this.brick.options.get("table.rows") || {};
+      const emptyData = this.brick.store.data() || [];
+      const columns = this.brick.columns.get() || [];
+      const uidField = this.brick.store.uidField();
+      const topHeight = startIndex * this._rowHeight;
+      const bottomHeight = (totalCount - endIndex) * this._rowHeight;
+      html2.clear(this._tbody);
+      if (topHeight > 0) {
+        const tr = html2.create("tr", { classList: ["vb-virtual-spacer", "top"] });
+        tr.style.height = topHeight + "px";
+        tr.innerHTML = `<td colspan="100" style="padding:0; border:0; height:${topHeight}px;"></td>`;
+        html2.append(this._tbody, tr);
+      }
+      for (let i = startIndex; i < endIndex; i++) {
+        const rowData = emptyData[i];
+        if (!rowData) {
+          this._renderSkeletonRow(i);
+          continue;
+        }
+        let item = itemMap[rowData[uidField]];
+        if (!item) {
+          item = { row: rowData };
+          itemMap[rowData[uidField]] = item;
+        }
+        const tr = html2.create("tr");
+        html2.attr(tr, "for", rowData[uidField]);
+        html2.attr(tr, "data-index", i);
+        if (window.getComputedStyle)
+          tr.style.height = this._rowHeight + "px";
+        for (let c = 0; c < columns.length; c++) {
+          const col = columns[c];
+          const td = html2.create("td");
+          html2.attr(td, "for", col.datafield);
+          const val = rowData[col.datafield];
+          td.textContent = val === void 0 || val === null ? "" : val;
+          html2.append(tr, td);
+        }
+        const eventData = {
+          item: { tr },
+          // For table-rows.js
+          tr,
+          // For table-rows-focused.js
+          row: rowData,
+          index: i,
+          columns
+        };
+        this.brick.events.fire("table:row:render", eventData);
+        html2.append(this._tbody, tr);
+      }
+      if (bottomHeight > 0) {
+        const tr = html2.create("tr", { classList: ["vb-virtual-spacer", "bottom"] });
+        tr.style.height = bottomHeight + "px";
+        tr.innerHTML = `<td colspan="100" style="padding:0; border:0; height:${bottomHeight}px;"></td>`;
+        html2.append(this._tbody, tr);
+      }
+      this.brick.options.setSilent("table.rows", itemMap);
+    },
+    _renderSkeletonRow: function(index) {
+      const html2 = this.brick.html;
+      const tr = html2.create("tr", { classList: ["vb-virtual-skeleton"] });
+      tr.style.height = this._rowHeight + "px";
+      html2.attr(tr, "data-index", index);
+      const td = html2.create("td");
+      td.colSpan = 100;
+      td.innerHTML = `<div class="vb-skeleton-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: vb-skeleton-loading 1.5s infinite;"></div>`;
+      html2.append(tr, td);
+      html2.append(this._tbody, tr);
+    }
+  },
+  events: [
+    {
+      for: "brick:status:ready",
+      on: {
+        fn: function() {
+          if (this._isEnabled()) {
+            this._initStructure();
+            this._wrapper.addEventListener("scroll", () => {
+              if (!this._ticking) {
+                window.requestAnimationFrame(() => {
+                  this._renderVisibleWindow();
+                  this._ticking = false;
+                });
+                this._ticking = true;
+              }
+            }, { passive: true });
+          }
+        }
+      }
+    },
+    // Hook into data updates to refresh the window
+    {
+      for: "store:data:load",
+      after: {
+        fn: function() {
+          if (this._isEnabled())
+            this._renderVisibleWindow();
+        }
+      }
+    },
+    {
+      for: "store:data:updated",
+      after: {
+        fn: function() {
+          if (this._isEnabled())
+            this._renderVisibleWindow();
+        }
+      }
+    },
+    // Intercept standard render requests (e.g. from Sort or Filter)
+    {
+      for: "table:rows:render",
+      before: {
+        priority: 5,
+        // High priority (runs before table-rows at 10), but leaves room for critical hooks (0-4)
+        fn: function(ev) {
+          if (this._isEnabled()) {
+            this._renderVisibleWindow();
+            ev.virtualHandled = true;
+          }
+        }
+      }
+    }
+  ],
+  init: function() {
+  },
+  destroy: function() {
+  }
+};
+var table_virtual_default = tableVirtual;
+
 // src/components/table.js
 var table = {
   for: [{ host: "brick", kind: "table" }],
   requires: ["html"],
   ns: "table",
   options: {},
+  /**
+   * Public Brick API
+   */
   brick: {
+    /**
+     * Refresh the internal rows cache from DOM
+     */
     refresh: function() {
-      if (this.__tableExt)
-        this.__tableExt._refreshRows();
+      this._refreshRows();
     },
+    /**
+     * Get current selection state
+     * @returns {{ index: number, row: HTMLElement|null }}
+     */
     getSelection: function() {
-      const ext = this.__tableExt;
-      if (!ext)
-        return { index: -1, row: null };
-      const idx = typeof ext.selectedIndex === "number" ? ext.selectedIndex : -1;
-      const row = idx >= 0 && ext.rows && ext.rows[idx] ? ext.rows[idx] : null;
+      const idx = typeof this._selectedIndex === "number" ? this._selectedIndex : -1;
+      const rows = this._rows || [];
+      const row = idx >= 0 && rows[idx] ? rows[idx] : null;
       return { index: idx, row };
     },
+    /**
+     * Clear current selection
+     */
     clearSelection: function() {
-      if (this.__tableExt)
-        this.__tableExt._setSelectedIndex(-1);
+      this._setSelectedIndex(-1);
     }
   },
+  /**
+   * Private extension methods (accessible via this._methodName from brick API)
+   */
   extension: {
-    table: null,
-    rows: [],
-    selectedIndex: -1,
+    // State
+    _table: null,
+    _rows: [],
+    _selectedIndex: -1,
+    /**
+     * Find and cache the table element
+     * @returns {HTMLTableElement|null}
+     */
     _findTable: function() {
       const root = this.brick.html && typeof this.brick.html.element === "function" ? this.brick.html.element() : null;
       if (!root || !root.querySelector) {
-        this.table = null;
+        this._table = null;
         return null;
       }
       const table2 = root.querySelector("table.vb-table") || root.querySelector("table");
-      this.table = table2 || null;
-      return this.table;
+      this._table = table2 || null;
+      return this._table;
     },
+    /**
+     * Refresh the internal row array from DOM
+     */
     _refreshRows: function() {
-      const table2 = this.table || this._findTable();
+      const table2 = this._table || this._findTable();
       if (!table2) {
-        this.rows = [];
-        this.selectedIndex = -1;
+        this._rows = [];
+        this._selectedIndex = -1;
         return;
       }
       const body = table2.tBodies && table2.tBodies.length ? table2.tBodies[0] : table2.querySelector("tbody");
       const rows = body ? body.rows : table2.rows;
-      this.rows = Array.prototype.slice.call(rows || []);
-      if (this.selectedIndex >= this.rows.length) {
-        this.selectedIndex = -1;
+      this._rows = Array.prototype.slice.call(rows || []);
+      if (this._selectedIndex >= this._rows.length) {
+        this._selectedIndex = -1;
       }
     },
+    /**
+     * Set the selected row index and update CSS classes
+     * @param {number} index
+     */
     _setSelectedIndex: function(index) {
-      const rows = this.rows || [];
+      const rows = this._rows || [];
       if (!rows.length) {
-        this.selectedIndex = -1;
+        this._selectedIndex = -1;
         return;
       }
       if (typeof index !== "number" || index < 0 || index >= rows.length) {
         index = -1;
       }
-      for (let i2 = 0; i2 < rows.length; i2 += 1) {
-        const row = rows[i2];
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i];
         if (!row || !row.classList)
           continue;
-        if (i2 === index)
+        if (i === index)
           row.classList.add("selected");
         else
           row.classList.remove("selected");
       }
-      this.selectedIndex = index;
+      this._selectedIndex = index;
     }
   },
+  /**
+   * Event handlers
+   */
   events: [
     {
       for: "brick:status:ready",
@@ -2794,7 +3471,7 @@ var table = {
       for: "dom:click:*",
       on: {
         fn: function(ev) {
-          const table2 = this.table || this._findTable();
+          const table2 = this._table || this._findTable();
           if (!table2)
             return;
           if (!ev || !ev.data || !ev.data.domEvent)
@@ -2814,32 +3491,29 @@ var table = {
           if (!clickedRow)
             return;
           this._refreshRows();
-          const rows = this.rows || [];
+          const rows = this._rows || [];
           const index = rows.indexOf(clickedRow);
           if (index === -1)
             return;
-          if (this.selectedIndex === index)
+          if (this._selectedIndex === index) {
             this._setSelectedIndex(-1);
-          else
+          } else {
             this._setSelectedIndex(index);
+          }
         }
       }
     }
   ],
   init: function() {
-    this.brick.__tableExt = this;
-    this.table = null;
-    this.rows = [];
-    this.selectedIndex = -1;
+    this._table = null;
+    this._rows = [];
+    this._selectedIndex = -1;
     return true;
   },
   destroy: function() {
-    this.rows = [];
-    this.table = null;
-    this.selectedIndex = -1;
-    if (this.brick) {
-      delete this.brick.__tableExt;
-    }
+    this._rows = [];
+    this._table = null;
+    this._selectedIndex = -1;
   }
 };
 var table_default = table;
@@ -2863,6 +3537,15 @@ function registerBuiltins(VanillaBrick2) {
   }
   if (html_default) {
     VanillaBrick2.extensions["html"] = html_default;
+  }
+  if (store_local_default) {
+    VanillaBrick2.extensions["storeLocal"] = store_local_default;
+  }
+  if (store_remote_default) {
+    VanillaBrick2.extensions["storeRemote"] = store_remote_default;
+  }
+  if (store_sort_default) {
+    VanillaBrick2.extensions["storeSort"] = store_sort_default;
   }
   if (store_default) {
     VanillaBrick2.extensions["store"] = store_default;
@@ -2893,6 +3576,9 @@ function registerBuiltins(VanillaBrick2) {
   }
   if (table_rows_default) {
     VanillaBrick2.extensions["tableRows"] = table_rows_default;
+  }
+  if (table_virtual_default) {
+    VanillaBrick2.extensions["tableVirtual"] = table_virtual_default;
   }
   if (table_default) {
     VanillaBrick2.extensions["table"] = table_default;

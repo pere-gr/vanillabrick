@@ -6,9 +6,12 @@ import extensions_0 from './extensions/html-css.js';
 import extensions_1 from './extensions/html-events.js';
 import extensions_2 from './extensions/html-render.js';
 import extensions_3 from './extensions/html.js';
-import extensions_4 from './extensions/store.js';
-import extensions_5 from './extensions/wire-client.js';
-import extensions_6 from './extensions/wire-service.js';
+import extensions_4 from './extensions/store-local.js';
+import extensions_5 from './extensions/store-remote.js';
+import extensions_6 from './extensions/store-sort.js';
+import extensions_7 from './extensions/store.js';
+import extensions_8 from './extensions/wire-client.js';
+import extensions_9 from './extensions/wire-service.js';
 import components_0 from './components/form-items.js';
 import components_1 from './components/form-record.js';
 import components_2 from './components/form.js';
@@ -16,7 +19,8 @@ import components_3 from './components/status-bar.js';
 import components_4 from './components/table-columns.js';
 import components_5 from './components/table-rows-focused.js';
 import components_6 from './components/table-rows.js';
-import components_7 from './components/table.js';
+import components_7 from './components/table-virtual.js';
+import components_8 from './components/table.js';
 import services_0 from './services/wire.js';
 
 export function registerBuiltins(VanillaBrick) {
@@ -35,13 +39,22 @@ if (extensions_3) {
   VanillaBrick.extensions['html'] = extensions_3;
 }
 if (extensions_4) {
-  VanillaBrick.extensions['store'] = extensions_4;
+  VanillaBrick.extensions['storeLocal'] = extensions_4;
 }
 if (extensions_5) {
-  VanillaBrick.extensions['wire'] = extensions_5;
+  VanillaBrick.extensions['storeRemote'] = extensions_5;
 }
 if (extensions_6) {
-  VanillaBrick.extensions['wireservice'] = extensions_6;
+  VanillaBrick.extensions['storeSort'] = extensions_6;
+}
+if (extensions_7) {
+  VanillaBrick.extensions['store'] = extensions_7;
+}
+if (extensions_8) {
+  VanillaBrick.extensions['wire'] = extensions_8;
+}
+if (extensions_9) {
+  VanillaBrick.extensions['wireservice'] = extensions_9;
 }
 if (components_0) {
   VanillaBrick.extensions['formItems'] = components_0;
@@ -65,7 +78,10 @@ if (components_6) {
   VanillaBrick.extensions['tableRows'] = components_6;
 }
 if (components_7) {
-  VanillaBrick.extensions['table'] = components_7;
+  VanillaBrick.extensions['tableVirtual'] = components_7;
+}
+if (components_8) {
+  VanillaBrick.extensions['table'] = components_8;
 }
 VanillaBrick.services['WireService'] = services_0;
 
