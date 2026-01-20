@@ -96,14 +96,16 @@ EventBusController.prototype._validateEventName = function (eventName) {
   }
   const parts = eventName.split(':');
 
-  // Strict 3-segment rule
-  if (parts.length !== 3) {
-    console.error('[EventBus] Invalid event name format. Expected exactly "namespace:type:target" (3 segments). Got:', eventName);
+  // We expect at least namespace, type, and target.
+  if (parts.length < 3) {
+    console.error('[EventBus] Invalid event name format. Expected "namespace:type:target". Got:', eventName);
     return false;
   }
 
-  // Validation for Dispatch: No empty parts, no wildcards allowed
-  if (!parts[0] || parts[0] === '*' || !parts[1] || parts[1] === '*' || !parts[2] || parts[2] === '*') {
+  // Validation for Dispatch: No empty parts, no wildcards allowed in namespace or type.
+  // Target can be complex, so we check the joined target string.
+  const target = parts.slice(2).join(':');
+  if (!parts[0] || parts[0] === '*' || !parts[1] || parts[1] === '*' || !target || target === '*') {
     console.error('[EventBus] Invalid event name for dispatch. Wildcards (*) and empty segments are not allowed in namespace, type, or target.', eventName);
     return false;
   }

@@ -8,9 +8,10 @@ export const statusBar = {
             after: {
                 fn: function (ev) {
                     const record = ev.data.row;
+                    const uidField = ev.data.uidField;
                     const el = this.brick.html.element();
                     if (el) {
-                        el.textContent = `Wire OK -> Selected: ${record.name}`;
+                        el.textContent = `Wire OK -> Selected: ${record[uidField]}`;
                     }
                 }
             }

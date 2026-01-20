@@ -117,30 +117,16 @@ ExtensionsController.prototype._install = function (brick, def) {
 
   let ctxExt;
   if (protos && protos.ext) {
-    // Create extension context from prototype
     ctxExt = Object.create(protos.ext);
-    // Assign specific instance properties
     ctxExt.brick = brick;
-    ctxExt.ext = ctxExt; // self-ref for some legacy code patterns
-    ctxExt._ctx = ctxExt;
   } else {
     // Fallback creation
-    const ext = {
+    ctxExt = {
+      brick: brick,
       name: name,
-      def: def.ext,
-      brick: brick
+      def: def.ext
     };
-    ctxExt = Object.create(ext);
-    ctxExt.brick = brick;
-    ctxExt.ext = ext;
-    ctxExt._ctx = ctxExt;
   }
-
-  // Inject Core APIs for context compatibility
-  // Many legacy extensions expect 'this.options' to refer to the brick's options API
-  Object.defineProperty(ctxExt, 'options', { value: brick.options, writable: false, enumerable: false, configurable: true });
-  Object.defineProperty(ctxExt, 'events', { value: brick.events, writable: false, enumerable: false, configurable: true });
-  Object.defineProperty(ctxExt, 'status', { value: brick.status, writable: false, enumerable: false, configurable: true });
 
   // API Context (what 'this' refers to in API methods)
   // Usually it mirrors ctxExt but for API mapping we might separate it conceptually
@@ -256,18 +242,9 @@ ExtensionsController.prototype._install = function (brick, def) {
             fnName: desc.fn.name || 'anon'
           };
 
-          // Handler must be bound to extension context
-          const handler = function (ev) {
-            const args = [ev];
-            if (runtime && typeof runtime.execute === 'function') {
-              return runtime.execute(desc.fn, ctxExt, args, meta);
-            }
-            return desc.fn.apply(ctxExt, args);
-          };
-
-          // Use the public or direct API? Direct if we have access, but public is fine too.
-          // Using direct call to controller is better inside controller logic
-          brick.events.on(pattern, phase, pr, handler, { ext: name, fn: desc.fn.name });
+          // Use descriptor instead of closure to avoid double-wrapping
+          // This allows EventsController to handle execution optimally (Zero-Bind)
+          brick.events.on(pattern, phase, pr, { fn: desc.fn, ctx: ctxExt, meta: meta });
         });
       }
     }

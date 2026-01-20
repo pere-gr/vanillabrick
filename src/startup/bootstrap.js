@@ -29,7 +29,7 @@ export function setupBootstrap(VanillaBrick) {
           VanillaBrick.configs[key] = Object.assign({}, base, next);
         }
       } catch (err) {
-        console.warn('VanillaBrick: invalid JSON in data-brick config', err);
+        console.warn('VanillaBrick: invalid JSON in data-brick config', err,node);
       }
     }
   }
@@ -52,14 +52,14 @@ export function setupBootstrap(VanillaBrick) {
     if (el.__brickInstance) return el.__brickInstance;
 
     const opts = {};
-
-    const config = el.id && VanillaBrick.configs ? VanillaBrick.configs[el.id] : null;
+    const elId = el.getAttribute && el.getAttribute("id"); 
+    const config = elId && VanillaBrick.configs ? VanillaBrick.configs[elId] : null;
     if (config && typeof config === 'object') {
       Object.assign(opts, config);
     }
 
-    if (el.id) {
-      opts.id = el.id;
+    if (elId) {
+      opts.id = elId;
     }
 
     const kind = readKind(el);
@@ -69,7 +69,7 @@ export function setupBootstrap(VanillaBrick) {
 
     // NESTED: tot el que és de DOM sota html.{}
     opts.html = {
-      id: el.id || null,
+      id: elId || null,
       element: el
     };
 
@@ -78,7 +78,7 @@ export function setupBootstrap(VanillaBrick) {
     el.__brickInstance = brick;
     registry.list.push(brick);
     registry.byId[brick.id] = brick;
-    console.log("Brick", el.id, brick);
+    console.log("Brick", elId, brick);
     return brick;
   }
 

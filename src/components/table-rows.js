@@ -5,16 +5,17 @@ export const tableRows = {
   options: {},
 
   brick: {
-    render: function () {
+    render: function (ev) {
+      if (ev == null || ev.data == null) return;
       const html = this.brick.html;
       const root = html.element();
       if (!root) return;
       const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-      const rows = this.brick.store.load();
+      const rows = ev.data;
       const columns = this.brick.columns.get();
 
-      this.brick.events.fire('table:rows:data', { rows: rows, columns: columns });
+      //this.brick.events.fire('table:rows:data', { rows: rows, columns: columns });
 
       // Fire render pipeline
       this.brick.events.fire('table:rows:render', { rows: rows, columns: columns });
@@ -28,65 +29,68 @@ export const tableRows = {
       for: 'brick:status:ready',
       on: {
         fn: function (ev) {
-          console.log("what happened?", ev.event.name);
-          this.brick.rows.render();
+          // Initial render will be triggered by store:data:load after phase
+          // No need to render here - store.load() is called by store.js
         }
       }
     },
     {
       for: 'store:data:*',
       after: {
+        priority: 5, // After virtual (priority 3)
         fn: function (ev) {
-          console.log("what happened?", ev.event.name);
-          this.brick.rows.render();
+          // Skip if virtual scroll handled rendering
+          if (ev.virtualHandled) return;
+
+          this.brick.rows.render(ev);
         }
       }
     },
     {
       for: 'table:rows:render',
       before: {
-        priority:0,
-        fn:function(ev){
+        priority: 10, // Low priority: Run AFTER extensions (like virtual scroll) have had a chance
+        fn: function (ev) {
           const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
           const html = this.brick.html;
           const items = this.brick.options.get("table.rows") || {};
-          const rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
+          const rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.data();
           const columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
-
-          for (let i = 0; i < rows.length; i++){
-            let item = items[rows[i].key];
-            if (item == null){
+          const uidField = this.brick.store.uidField();
+          for (let i = 0; i < rows.length; i++) {
+            let item = items[rows[i][uidField]];
+            if (item == null) {
               item = {};
-              items[rows[i].key] = item ;
+              items[rows[i][uidField]] = item;
             }
 
             item.row = rows[i];
             let tr = item.tr || null;
-            if (tr == null){
+            if (tr == null) {
               tr = html.create('tr');
-              html.attr(tr,'for',item.row.key);
-              items[item.row.key].tr = tr;
+              html.attr(tr, 'for', item.row[uidField]);
+              items[item.row[uidField]].tr = tr;
             }
 
-            for(c = 0; c < columns.length; c++){
+            for (let c = 0; c < columns.length; c++) {
               let td = tr.children.length > 0 ? tr.children[c] : null;
-              if (td == null){
+              if (td == null) {
                 td = html.create('td');
-                html.append(tr,td);
+                html.append(tr, td);
               }
-              html.attr(td,'for',columns[c].datafield);
-              html.setSafe(td,item.row[columns[c].datafield])
+              html.attr(td, 'for', columns[c].datafield);
+              html.setSafe(td, item.row[columns[c].datafield])
             }
-            
+
           }
-          this.brick.options.setSilent("table.rows",items);
+          this.brick.options.setSilent("table.rows", items);
           const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
           const ms = Math.round(t1 - t0);
-          console.warn('data created in...', ms, 'ms');
+          console.warn('data created in...', ms, 'ms', 'total items:', Object.keys(items).length);
         }
       }
-    },    
+    },
     {
       // Manage full rows render pipeline
       for: 'table:rows:render',
@@ -102,7 +106,7 @@ export const tableRows = {
           ev.data.t0 = t0;
           // Ensure rows/columns available to downstream phases
           ev.data.items = items;
-          ev.data.rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
+          //ev.data.rows = Array.isArray(ev.data.rows) ? ev.data.rows : this.brick.store.load();
           ev.data.columns = Array.isArray(ev.data.columns) ? ev.data.columns : this.brick.columns.get();
 
           const table = root.tagName && root.tagName.toLowerCase() === 'table'
@@ -110,10 +114,26 @@ export const tableRows = {
             : (html.get && html.get('table')) || (root.querySelector && root.querySelector('table'));
           if (!table) return;
 
+          // Skip if virtual scroll is active (it handles its own rendering)
+          if (this.brick.options.get('table.virtual.enabled')) {
+            ev.virtualHandled = true;
+            ev.cancel = true; // Stop propagation of global render
+            return;
+          }
+
           // Prepare old/new tbody and pool of existing trs
           const tbody = html.detach(table.querySelector('tbody'));
-          for (i = tbody.children.length; i >= 0 ; i--){
-            html.detach(tbody.children[i]);
+          if (tbody) {
+            for (let i = tbody.children.length - 1; i >= 0; i--) {
+              html.detach(tbody.children[i]);
+            }
+          } else {
+            // Create one if missing
+            const newTbody = html.create('tbody');
+            html.append(table, newTbody);
+            ev.data.table = table;
+            ev.data.tbody = newTbody;
+            return;
           }
 
           ev.data.table = table;
@@ -122,13 +142,16 @@ export const tableRows = {
       },
       on: {
         fn: function (ev) {
+          //console.log("RENDER ON",ev);
+
           const data = ev.data || {};
-          const rows = Array.isArray(ev && ev.data && ev.data.rows) ? ev.data.rows : this.brick.store.load();
+          const rows = Array.isArray(ev && ev.data && ev.data.rows) ? ev.data.rows : this.brick.store.data();
           const columns = Array.isArray(ev && ev.data && ev.data.columns) ? ev.data.columns : this.brick.columns.get();
           data.columns = columns;
           data.rows = rows;
+          const uidField = this.brick.store.uidField();
           for (let i = 0; i < rows.length; i += 1) {
-            const item = ev.data.items[rows[i].key];
+            const item = ev.data.items[rows[i][uidField]];
             const rowData = rows[i] || {};
             this.brick.events.fire('table:row:render', {
               item: item,
@@ -152,12 +175,12 @@ export const tableRows = {
             html.append(tbody, data.frag);
           }*/
           requestAnimationFrame(() => {
-                    html.append(data.table,tbody);
+            html.append(data.table, tbody);
           });
 
           const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
           const ms = Math.round(t1 - ev.data.t0);
-        console.warn('table rows pipeline time', ms, 'ms');
+          console.warn('table rows pipeline time', ms, 'ms');
           //html.append(data.table,tbody);
         }
       }
@@ -212,13 +235,13 @@ export const tableRows = {
           const column = ev.data.column;
           const row = ev.data.row;
           if (!tr) return;
-          let td = html.get('[for="' + column.datafield + '"]',tr);
+          let td = html.get('[for="' + column.datafield + '"]', tr);
           if (!td) {
             td = html.create('td');
-            html.attr(td,'for',column.datafield);
+            html.attr(td, 'for', column.datafield);
             html.append(tr, td);
           }
-          html.setSafe(td,row[column.datafield]);
+          html.setSafe(td, row[column.datafield]);
           ev.data.td = td;
         }
       },

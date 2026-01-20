@@ -176,7 +176,9 @@
     cursor: not-allowed;
 }
 /* VanillaBrick Layout System - Grid Layout */
-
+html, body {
+  height: 100%;
+}
 /* Container */
 .vb-container {
   width: 100%;
@@ -349,11 +351,12 @@ tr.vb-focused {
 
 /* Table container */
 .vb-table {
+    height:80vh;
     width: 100%;
     border-collapse: collapse;
     border: var(--vb-border-width) solid var(--vb-border);
     border-radius: var(--vb-radius-lg);
-    overflow: hidden;
+    overflow: auto;
     background-color: var(--vb-background);
     font-size: var(--vb-text-sm);
 }
@@ -464,6 +467,110 @@ tr.vb-focused {
 .vb-table-wrapper {
     overflow-x: auto;
     border-radius: var(--vb-radius-lg);
+}
+
+/* Virtual scroll wrapper */
+.vb-table-wrapper.vb-virtual {
+    max-height: var(--vb-table-max-height, 400px);
+    overflow-y: auto;
+    position: relative;
+}
+
+/* Sticky header for virtual scroll */
+.vb-table-wrapper.vb-virtual .vb-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+/* Virtual spacers (invisible, just for scroll height) */
+.vb-virtual-spacer-top,
+.vb-virtual-spacer-bottom {
+    display: table-row-group;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.vb-sortable {
+    cursor: pointer;
+    position: relative;
+    padding-right: 25px !important;
+    transition: background-color 0.2s;
+}
+
+.vb-sortable:hover {
+    background-color: #f7f7f7;
+}
+
+.vb-sortable::after {
+    content: '↕';
+    position: absolute;
+    right: 8px;
+    opacity: 0.3;
+    font-size: 0.8em;
+}
+
+.vb-sort-asc::after {
+    content: '↑';
+    opacity: 1;
+    color: #4CAF50;
+}
+
+.vb-sort-desc::after {
+    content: '↓';
+    opacity: 1;
+    color: #4CAF50;
+}
+
+.vb-virtual-spacer-top tr,
+.vb-virtual-spacer-bottom tr {
+    display: none;
+}
+
+/* Focused Row */
+.vb-table tbody tr.vb-focused {
+    background-color: var(--vb-primary-50);
+    outline: 2px solid var(--vb-primary-500);
+    outline-offset: -2px;
+}
+
+/* Virtual Table Rows - Fixed Height Enforcement */
+.vb-table-wrapper.vb-virtual .vb-table tbody tr {
+    height: 33px; /* Default row height matching table-virtual default */
+    overflow: hidden;
+}
+
+.vb-table-wrapper.vb-virtual .vb-table tbody td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 33px;
+    box-sizing: border-box;
+}
+
+/* Skeleton Loading State */
+.vb-row-loading td {
+    padding: 0 !important;
+    height: 33px;
+    border: none;
+}
+
+.vb-skeleton-bar {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: vb-skeleton-loading 1.5s infinite;
+}
+
+@keyframes vb-skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
 }
 
 /* VanillaBrick Design System - CSS Variables */

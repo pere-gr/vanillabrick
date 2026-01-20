@@ -49,6 +49,27 @@
         <script type="application/json" data-brick>
         {
           "grid1": {
+            "table": {
+              "virtual": {
+                "enabled": true,
+                "pageSize": 25,
+                "maxHeight": 300
+              }
+            },
+            "store":{
+              "uidField":"id",
+              "type": "remote",
+              "url":"https://jsonplaceholder.typicode.com/todos",
+              "pagination": {
+                  "mode": "client",
+                  "pageSize": 50,
+                  "params": {
+                      "offset": "_start",
+                      "limit": "_limit"
+                  }
+              },
+              "defaultTotalCount": 200
+            },
             "wire": {
               "master": true,
               "slave": []
@@ -68,14 +89,14 @@
             <div class="vb-row">
               <div class="vb-span-6">
                 <div class="vb-form-field">
-                  <label for="code">Code</label>
-                  <input type="text" id="code" name="code" placeholder="Enter code">
+                  <label for="userId">userId</label>
+                  <input type="text" id="userId" name="userId" placeholder="Enter userId">
                 </div>
               </div>
               <div class="vb-span-6">
                 <div class="vb-form-field">
-                  <label for="name">Name</label>
-                  <input type="text" id="name" name="name" placeholder="Enter name">
+                  <label for="title">title</label>
+                  <input type="text" id="title" name="title" placeholder="Enter title">
                 </div>
               </div>
             </div>
@@ -86,8 +107,8 @@
             <div class="vb-row">
               <div class="vb-span-12">
                 <div class="vb-form-field">
-                  <label for="key">key</label>
-                  <input type="text" id="key" name="key" placeholder="key">
+                  <label for="idx">id</label>
+                  <input type="text" id="idx" name="id" placeholder="id">
                 </div>
               </div>
             </div>

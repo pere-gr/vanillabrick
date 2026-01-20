@@ -1,5 +1,7 @@
 /* VanillaBrick Layout System - Grid Layout */
-
+html, body {
+  height: 100%;
+}
 /* Container */
 .vb-container {
   width: 100%;

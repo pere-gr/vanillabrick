@@ -7,7 +7,7 @@ export const formRecord = {
     brick: {
         // We could expose methods to get/set the current record directly if needed
         getRecord: function () {
-            const data = this.store.load();
+            const data = this.brick.store.data();
             return (data && data.length) ? data[0] : null;
         }
     },
@@ -43,10 +43,8 @@ export const formRecord = {
             for: 'brick:status:ready',
             on: {
                 fn: function (ev) {
-                    const data = this.brick.store.load();
-                    if (data && data.length) {
-                        this._bind(data[0]);
-                    }
+                    // Initial bind will be triggered by store:data:load after phase
+                    // No need to load here - store.js already triggers load
                 }
             }
         },
@@ -54,7 +52,7 @@ export const formRecord = {
             for: 'store:data:*',
             after: {
                 fn: function (ev) {
-                    const data = this.brick.store.load();
+                    const data = ev.data; //this.brick.store.load();
                     // We bind the first record
                     const record = (data && data.length) ? data[0] : null;
                     this._bind(record);
